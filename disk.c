@@ -35,7 +35,7 @@ int disk_read_sector(int lba, uint8_t* buffer) {
         return -1;
     }
 
-    print("disk_read_sector: reading sector...\n");
+    //print("disk_read_sector: reading sector...\n");
 
     outb(ATA_PRIMARY_IO + 6, 0xA0 | ((lba >> 24) & 0x0F));
     outb(ATA_PRIMARY_IO + 2, 1); 
@@ -64,7 +64,7 @@ int disk_read_sector(int lba, uint8_t* buffer) {
         buffer[i * 2 + 1] = (data >> 8) & 0xFF;
     }
 
-    print("disk_read_sector: read complete\n");
+    //print("disk_read_sector: read complete\n");
     return 0;
 }
 

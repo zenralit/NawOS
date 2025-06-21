@@ -136,13 +136,13 @@ void fs_list() {
     for (int i = 0; i < file_count; i++) {
         print(" - ");
         print(entries[i].name);
-        print(".");
-        print(entries[i].ext);
-        print(" (");
-        char size[8];
-        itoa(entries[i].size, size);
-        print(size);
-        print(" bytes)\n");
+        // print(".");
+        // print(entries[i].ext);
+        // print(" (");
+        // char size[8];
+        // itoa(entries[i].size, size);
+        // print(size);
+        // print(" bytes)\n");
     }
 }
 

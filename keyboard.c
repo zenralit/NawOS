@@ -229,7 +229,6 @@ void keyboard_handle_scancode(uint8_t scancode) {
 }
 
 void keyboard_init() {
-    print("IRQ1\n");
     uint8_t mask = inb(0x21);
     outb(0x21, mask & ~0x02);
 }
