@@ -117,25 +117,26 @@ void process_command(const char* input) {
     } else if (strncmp(input, "cat ", 4) == 0) {
     const char* file = input + 4;
     const char* dot = find_char(file, '.');
+
     if (dot && dot > file) {
-        char name[9] = {0};
-        char ext[4] = {0};
+        char name[8] = { ' ' }; // инициализируем пробелами или нулями
+        char ext[3]  = { ' ' };
+
         size_t namelen = dot - file;
         if (namelen > 8) namelen = 8;
-        memcpy(name, file, namelen);
-        strncpy(ext, dot + 1, 3);
-        ext[3] = '\0';
+        for (size_t i = 0; i < namelen; ++i) name[i] = file[i];
 
-        if (strlen(ext) == 0 || strlen(name) == 0) {
-            print("Invalid filename. Use name.ext\n");
+        const char* ext_start = dot + 1;
+        size_t extlen = strlen(ext_start);
+        if (extlen > 3) extlen = 3;
+        for (size_t i = 0; i < extlen; ++i) ext[i] = ext_start[i];
+
+        const char* data = fs_read(name, ext);
+        if (data) {
+            print(data);
+            print("\n");
         } else {
-            const char* data = fs_read(name, ext);
-            if (data) {
-                print(data);
-                print("\n");
-            } else {
-                print("File not found\n");
-            }
+            print("File not found\n");
         }
     } else {
         print("Invalid filename. Use name.ext\n");

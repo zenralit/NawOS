@@ -15,29 +15,28 @@ nawfs_entry entries[MAX_FILES];
 char file_data[SECTOR_SIZE * (MAX_FILES + 1)];
 int file_count = 0;
 static uint8_t fs_buffer[SECTOR_SIZE];
-
+int memcmp(const void* s1, const void* s2, size_t n);
 void fs_init() {
-    asm volatile("cli"); 
+    asm volatile("cli");
 
+    uint8_t sector_data[SECTOR_SIZE]; 
 
     for (int i = 1; i <= CATALOG_SECTORS; i++) {
-        if (disk_read_sector(i, fs_buffer) != 0) {
+        if (disk_read_sector(i, sector_data) != 0) {
             print("FS: failed to read catalog sector\n");
-            asm volatile("sti"); 
+            asm volatile("sti");
             return;
         }
 
         for (int j = 0; j < SECTOR_SIZE / sizeof(nawfs_entry); j++) {
-            nawfs_entry* e = (nawfs_entry*)(fs_buffer + j * sizeof(nawfs_entry));
+            nawfs_entry* e = (nawfs_entry*)(sector_data + j * sizeof(nawfs_entry));
             if (e->name[0] != 0 && file_count < MAX_FILES) {
                 entries[file_count++] = *e;
             }
         }
     }
 
-    asm volatile("sti"); 
-
-    //  print("It doesn't work yet, but I'll fix it soon\n");
+    asm volatile("sti");
 }
 
 void fs_flush() {
@@ -108,16 +107,22 @@ int fs_write(const char* name, const char* ext, const char* data) {
 }
 
 const char* fs_read(const char* name, const char* ext) {
-    int i = find_file(name, ext);
-    if (i < 0) return NULL;
-
-    uint8_t* buf = (uint8_t*)(file_data + i * SECTOR_SIZE);
-    if (disk_read_sector(entries[i].sector, buf) != 0)
-        return NULL;
-
-    buf[entries[i].size] = 0; 
-    return (const char*)buf;
+    for (int i = 0; i < file_count; ++i) {
+        
+        if (memcmp(entries[i].name, name, 8) == 0 && memcmp(entries[i].ext, ext, 3) == 0) {
+            static char buffer[512];
+            if (disk_read_sector(entries[i].sector, (uint8_t*)buffer) == 0) {
+                buffer[entries[i].size] = '\0'; 
+                return buffer;
+            } else {
+                return NULL;
+            }
+        }
+    }
+    return NULL;
 }
+
+
 
 int fs_delete(const char* name, const char* ext) {
     int i = find_file(name, ext);
@@ -136,13 +141,13 @@ void fs_list() {
     for (int i = 0; i < file_count; i++) {
         print(" - ");
         print(entries[i].name);
-        // print(".");
-        // print(entries[i].ext);
-        // print(" (");
-        // char size[8];
-        // itoa(entries[i].size, size);
-        // print(size);
-        // print(" bytes)\n");
+        print(".");
+        print(entries[i].ext);
+        print(" (");
+        char size[8];
+        itoa(entries[i].size, size);
+        print(size);
+        print(" bytes)\n");
     }
 }
 
@@ -188,4 +193,14 @@ void itoa(int value, char* str) {
 
     while (i > 0) *p++ = buf[--i];
     *p = 0;
+}
+int memcmp(const void* s1, const void* s2, size_t n) {
+    const unsigned char* p1 = s1;
+    const unsigned char* p2 = s2;
+    for (size_t i = 0; i < n; i++) {
+        if (p1[i] != p2[i]) {
+            return p1[i] - p2[i];
+        }
+    }
+    return 0;
 }
