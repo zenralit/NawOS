@@ -13,12 +13,13 @@
 #define CATALOG_SECTORS 9
 
 typedef struct {
-    char name[FILENAME_LEN];      // 8
-    char ext[EXTENSION_LEN];      // 3
-    uint32_t size;                // 2
-    uint32_t sector;              // 2
-    char reserved[17];            // 17 
-} nawfs_entry;
+    char name[8];
+    char ext[3];
+    uint16_t size;
+    uint16_t sector;
+    char reserved[17];
+} __attribute__((packed)) nawfs_entry;
+
 
 void fs_init();
 void fs_list();

@@ -37,7 +37,7 @@ int disk_read_sector(int lba, uint8_t* buffer) {
 
     print("disk_read_sector: reading sector...\n");
 
-    outb(ATA_PRIMARY_IO + 6, 0xE0 | ((lba >> 24) & 0x0F));
+    outb(ATA_PRIMARY_IO + 6, 0xA0 | ((lba >> 24) & 0x0F));
     outb(ATA_PRIMARY_IO + 2, 1); 
     outb(ATA_PRIMARY_IO + 3, (uint8_t)(lba));
     outb(ATA_PRIMARY_IO + 4, (uint8_t)(lba >> 8));

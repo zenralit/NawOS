@@ -56,6 +56,6 @@ os-image.bin: bootloader.bin kernel.bin
 
 run: os-image.bin
 	qemu-system-i386 -drive file=os-image.bin,format=raw,index=0,if=floppy \
-	-drive file=nawfs.img,format=raw,index=1,if=ide -net none
+	-drive file=nawfs.img,format=raw,if=ide,bus=0,unit=0 -net none
 clean:
 	rm -f *.o *.bin os-image.bin

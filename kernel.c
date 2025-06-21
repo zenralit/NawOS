@@ -27,7 +27,7 @@ void kernel_main() {
     idt_init();
     keyboard_init();
      fs_init();
-   print("FS initialized.\n");
+
     asm volatile("sti");
 
     while (1) {  
