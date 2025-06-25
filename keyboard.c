@@ -119,17 +119,23 @@ void process_command(const char* input) {
     const char* dot = find_char(file, '.');
 
     if (dot && dot > file) {
-        char name[8] = { ' ' }; // инициализируем пробелами или нулями
-        char ext[3]  = { ' ' };
+        char name[8] = { 0 };
+        char ext[3] = { 0 };
 
         size_t namelen = dot - file;
         if (namelen > 8) namelen = 8;
-        for (size_t i = 0; i < namelen; ++i) name[i] = file[i];
+
+        
+        for (size_t i = 0; i < namelen; ++i) {
+            name[i] = file[i];
+        }
 
         const char* ext_start = dot + 1;
         size_t extlen = strlen(ext_start);
         if (extlen > 3) extlen = 3;
-        for (size_t i = 0; i < extlen; ++i) ext[i] = ext_start[i];
+        for (size_t i = 0; i < extlen; ++i) {
+            ext[i] = ext_start[i];
+        }
 
         const char* data = fs_read(name, ext);
         if (data) {
@@ -141,7 +147,7 @@ void process_command(const char* input) {
     } else {
         print("Invalid filename. Use name.ext\n");
     }
-   } else if (strncmp(input, "rm ", 3) == 0) {
+} else if (strncmp(input, "rm ", 3) == 0) {
     const char* file = input + 3;
     const char* dot = find_char(file, '.');
     if (dot && dot > file) {

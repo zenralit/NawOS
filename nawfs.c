@@ -123,10 +123,12 @@ const char* fs_read(const char* name, const char* ext) {
 }
 
 
-
 int fs_delete(const char* name, const char* ext) {
     int i = find_file(name, ext);
     if (i < 0) return -1;
+
+    uint8_t zero_sector[SECTOR_SIZE] = {0};
+    disk_write_sector(entries[i].sector, zero_sector);  
 
     for (int j = i; j < file_count - 1; j++) {
         entries[j] = entries[j + 1];
@@ -138,7 +140,9 @@ int fs_delete(const char* name, const char* ext) {
 }
 
 void fs_list() {
-    for (int i = 0; i < file_count; i++) {
+
+    
+       for (int i = 0; i < file_count; i++) {
         print(" - ");
         print(entries[i].name);
         print(".");
@@ -148,7 +152,8 @@ void fs_list() {
         itoa(entries[i].size, size);
         print(size);
         print(" bytes)\n");
-    }
+        }
+    
 }
 
 // --- Вспомогательные функции ---

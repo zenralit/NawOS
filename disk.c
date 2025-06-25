@@ -10,23 +10,35 @@
 #define ATA_STATUS_BSY     0x80
 #define ATA_STATUS_DRQ     0x08
 
-void ata_wait() {
-    int timeout = 100000; 
+#define ATA_SR_BSY     0x80
+#define ATA_SR_DRQ     0x08
+#define ATA_SR_ERR     0x01
 
-    while ((inb(ATA_PRIMARY_IO + 7) & 0x80) && --timeout);
+int ata_wait() {
+    int timeout = 100000;
+    uint8_t status;
 
+    // Ждём, пока диск освободится (BSY = 0)
+    while (((status = inb(ATA_PRIMARY_IO + 7)) & ATA_SR_BSY) && --timeout);
     if (timeout <= 0) {
         print("ATA timeout: BSY stuck\n");
-        return;
+        return -1;
     }
 
     timeout = 100000;
-
-    while (!(inb(ATA_PRIMARY_IO + 7) & 0x08) && --timeout);
-
+    // Ждём, пока готов к передаче данных (DRQ = 1)
+    while (!((status = inb(ATA_PRIMARY_IO + 7)) & ATA_SR_DRQ) && --timeout);
     if (timeout <= 0) {
-        print("ATA timeout: DRQ not ready\n");
+       // print("ATA timeout: DRQ not ready\n");
+        return -2;
     }
+
+    if (status & ATA_SR_ERR) {
+        print("ATA error: ERR set in status register\n");
+        return -3;
+    }
+
+    return 0;
 }
 
 int disk_read_sector(int lba, uint8_t* buffer) {
@@ -35,27 +47,15 @@ int disk_read_sector(int lba, uint8_t* buffer) {
         return -1;
     }
 
-    //print("disk_read_sector: reading sector...\n");
-
-    outb(ATA_PRIMARY_IO + 6, 0xA0 | ((lba >> 24) & 0x0F));
-    outb(ATA_PRIMARY_IO + 2, 1); 
+    outb(ATA_PRIMARY_IO + 6, 0xE0 | ((lba >> 24) & 0x0F)); 
+    outb(ATA_PRIMARY_IO + 2, 1);                          
     outb(ATA_PRIMARY_IO + 3, (uint8_t)(lba));
     outb(ATA_PRIMARY_IO + 4, (uint8_t)(lba >> 8));
     outb(ATA_PRIMARY_IO + 5, (uint8_t)(lba >> 16));
-    outb(ATA_PRIMARY_IO + 7, ATA_CMD_READ_PIO); 
-
-    int timeout = 100000;
-    while ((inb(ATA_PRIMARY_IO + 7) & 0x80) && --timeout); 
-    if (timeout <= 0) {
-        print("disk_read_sector: timeout waiting for BSY\n");
+    outb(ATA_PRIMARY_IO + 7, ATA_CMD_READ_PIO);
+    
+    if (ata_wait() != 0) {
         return -2;
-    }
-
-    timeout = 100000;
-    while (!(inb(ATA_PRIMARY_IO + 7) & 0x08) && --timeout); 
-    if (timeout <= 0) {
-        print("disk_read_sector: timeout waiting for DRQ\n");
-        return -3;
     }
 
     for (int i = 0; i < 256; i++) {
@@ -64,10 +64,8 @@ int disk_read_sector(int lba, uint8_t* buffer) {
         buffer[i * 2 + 1] = (data >> 8) & 0xFF;
     }
 
-    //print("disk_read_sector: read complete\n");
     return 0;
 }
-
 
 int disk_write_sector(int lba, const uint8_t* buffer) {
     outb(ATA_PRIMARY_IO + 6, 0xE0 | ((lba >> 24) & 0x0F));
