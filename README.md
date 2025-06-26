@@ -1,52 +1,5 @@
 
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 0 20px;
-      background-color: #121212;
-      color: #e0e0e0;
-      line-height: 1.6;
-    }
-
-    h1, h2, h3 {
-      color: #f0f0f0;
-    }
-
-    code {
-      background-color: #1e1e1e;
-      color: #dcdcdc;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-    }
-
-    pre {
-      background-color: #1e1e1e;
-      color: #dcdcdc;
-      padding: 12px;
-      border-radius: 6px;
-      overflow-x: auto;
-    }
-
-    blockquote {
-      border-left: 4px solid #888;
-      padding-left: 12px;
-      margin-left: 0;
-      color: #bbbbbb;
-    }
-
-    ul {
-      padding-left: 20px;
-    }
-
-    a {
-      color: #80cbc4;
-    }
-  </style>
-</head>
-<body>
+ 
 
   <h1>NawOS</h1>
   <p><strong>NawOS</strong> is a simple hobby operating system designed from scratch with basic shell commands and file management using a custom filesystem.</p>
