@@ -1,7 +1,7 @@
 <body>
 
   <h1>NawOS</h1>
-  <p><strong>NawOS</strong> is a simple hobby operating system designed from scratch with basic shell commands and file management using a custom filesystem.</p>
+  <p><strong>NawOS</strong> is a simple operating system with basic shell commands and file management using a custom filesystem.</p>
 
   <h2>⚠️ Prerequisites</h2>
   <blockquote>
