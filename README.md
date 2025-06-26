@@ -28,8 +28,7 @@ sudo apt install build-essential nasm qemu-system make</code></pre>
   <p>Install Ubuntu via Microsoft Store, then run the same <code>apt</code> commands as above.</p>
 
   <h2>🚀 Build and Run</h2>
-  <pre><code>make
-qemu-system-i386 -drive file=os-image.bin,format=raw,index=0,if=floppy -drive file=nawfs.img,format=raw,index=1,if=ide -net none</code></pre>
+  <pre><code>make clean && make && make run/code></pre>
 
   <h2>💻 Available Command</h2>
   <pre><code>help</code></pre>
