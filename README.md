@@ -1,5 +1,4 @@
-
- 
+<body>
 
   <h1>NawOS</h1>
   <p><strong>NawOS</strong> is a simple hobby operating system designed from scratch with basic shell commands and file management using a custom filesystem.</p>
@@ -28,7 +27,8 @@ sudo apt install build-essential nasm qemu-system make</code></pre>
   <p>Install Ubuntu via Microsoft Store, then run the same <code>apt</code> commands as above.</p>
 
   <h2>🚀 Build and Run</h2>
-  <pre><code>make clean && make && make run/code></pre>
+  <pre><code>make clean && make && make run
+</code></pre>
 
   <h2>💻 Available Command</h2>
   <pre><code>help</code></pre>
