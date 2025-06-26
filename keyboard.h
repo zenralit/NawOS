@@ -1,7 +1,15 @@
 #include <stddef.h>
 #include <stdint.h>
+
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
+
+extern void update_cursor();
+
+uint8_t get_scancode(); 
+void init_keyboard();
+void start_text_editor(); 
+
 void keyboard_input();
 void keyboard_handler();
 void keyboard_init();

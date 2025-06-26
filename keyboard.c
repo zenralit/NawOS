@@ -36,6 +36,83 @@ static const char scancode_map[128] = {
 
 // -------- keyboard map -------- //
 
+int fs_read_to_buffer(const char* name, const char* ext, char* buffer, int max_len) {
+    const char* file_data = fs_read(name, ext);
+    if (!file_data) return -1;
+
+   
+    int i;
+    for (i = 0; i < max_len - 1 && file_data[i] != '\0'; i++) {
+        buffer[i] = file_data[i];
+    }
+    buffer[i] = '\0';
+    return i;
+}
+
+void start_text_editor(const char* name, const char* ext) {
+    clear_screen();
+    print("Editing: ");
+    print(name); print("."); print(ext);
+    print("\n[Type text, ESC = exit, F2 = save]\n");
+
+    
+    int pos = 0;
+   char buffer[512] = {0};
+    if (fs_read_to_buffer(name, ext, buffer, sizeof(buffer)) < 0) {
+        print("File not found or error reading\n");
+    } else {
+        print("Loaded file content:\n");
+        print(buffer);
+    }
+    while (buffer[pos] != '\0' && pos < 511) {
+        put_char(buffer[pos]);
+        pos++;
+    }
+
+    update_cursor();
+
+    while (1) {
+        uint8_t sc = get_scancode();
+        if (sc == 0) continue;
+
+        
+        if (sc & 0x80) continue;
+
+        char c = scancode_map[sc];
+        if (!c) continue;
+
+        
+        if (c == 27) {
+            break;
+        }
+       
+        else if (sc == 60) {
+            fs_write(name, ext, buffer);
+            print("\nFile saved.\n");
+        }
+        else if (c == '\b') {
+            if (pos > 0) {
+                pos--;
+                buffer[pos] = '\0';
+                put_char('\b');
+            }
+        }
+        else if (c >= 32 && c <= 126) {
+            if (pos < 511) {
+                buffer[pos++] = c;
+                buffer[pos] = '\0';
+                put_char(c);
+            }
+        }
+    }
+
+    print("\nExited editor.\n");
+}
+
+
+
+
+
 void process_command(const char* input) {
     if (strcmp(input, "help") == 0) {
         print(" commands:\n");
@@ -48,7 +125,7 @@ void process_command(const char* input) {
         print("wr <text> - <name.ext> - Write to file\n");
         print("cat <name.ext> - Show file content\n");
         print("rm <name.ext> - Delete file\n");
-        print("readsec <num> - Read disk sector\n");
+    // print("readsec <num> - Read disk sector\n");
     } else if (strcmp(input, "clear") == 0) {
         clear_screen();
     } else if (strcmp(input, "reboot") == 0) {
@@ -183,7 +260,24 @@ void process_command(const char* input) {
         } else {
             print("Disk read error\n");
         }
+    }else if (strncmp(input, "edit ", 5) == 0) {
+    const char* file = input + 5;
+    const char* dot = find_char(file, '.');
+    if (dot && dot > file) {
+        char name[9] = {0};
+        char ext[4] = {0};
+        size_t namelen = dot - file;
+        if (namelen > 8) namelen = 8;
+        memcpy(name, file, namelen);
+        strncpy(ext, dot + 1, 3);
+        ext[3] = '\0';
+
+        start_text_editor(name, ext);
     } else {
+        print("Invalid filename. Use name.ext\n");
+    }
+    } 
+    else {
         print("Unknown command. Type 'help' for help.\n");
     }
     print("\n> ");

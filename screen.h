@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+extern uint16_t cursor_offset;
+void update_cursor();
 void clear_screen();
 void put_char(char c);
 void print(const char* s);

@@ -18,7 +18,7 @@ int ata_wait() {
     int timeout = 100000;
     uint8_t status;
 
-    // Ждём, пока диск освободится (BSY = 0)
+    
     while (((status = inb(ATA_PRIMARY_IO + 7)) & ATA_SR_BSY) && --timeout);
     if (timeout <= 0) {
         print("ATA timeout: BSY stuck\n");
@@ -26,7 +26,7 @@ int ata_wait() {
     }
 
     timeout = 100000;
-    // Ждём, пока готов к передаче данных (DRQ = 1)
+    
     while (!((status = inb(ATA_PRIMARY_IO + 7)) & ATA_SR_DRQ) && --timeout);
     if (timeout <= 0) {
        // print("ATA timeout: DRQ not ready\n");
