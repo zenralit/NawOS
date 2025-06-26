@@ -8,11 +8,9 @@ start:
     mov es, ax
     mov ss, ax
     mov sp, 0x7C00
-
     mov [boot_drive], dl
-
-   
     mov si, msg_load
+
 .print:
     lodsb
     or al, al
@@ -20,9 +18,9 @@ start:
     mov ah,0x0E
     int 0x10
     jmp .print
-                            ;пиздаа
+                            
 .load:
-     mov ah, 0x02       ; функция чтения секторов
+    mov ah, 0x02        ; функция чтения секторов
     mov al, 25          ; количество секторов
     mov ch, 0           ; цилиндр
     mov cl, 10          ; сектор (начинается с 1)
@@ -31,24 +29,21 @@ start:
     mov bx, 0x1000      ; адрес загрузки
     int 0x13            ; BIOS прерывание
 
-   
     in al,0x92
     or al,2
     out 0x92,al
-
     
     lgdt [gdt_desc]
-
   
     mov eax,cr0
     or eax,1
     mov cr0,eax
-
     
     jmp 0x08:protected
 
 .disk_error:
     mov si, msg_err
+
 .err:
     lodsb
     or al,al
@@ -56,7 +51,6 @@ start:
     mov ah,0x0E
     int 0x10
     jmp .err
-
 
 gdt_start:
     dq 0

@@ -23,7 +23,6 @@ typedef struct {
     uint32_t size;
 } __attribute__((packed)) DirEntry;
 
-
 int read_sector(uint8_t* buffer, uint32_t lba) {
     uint8_t chs[] = {
         0x00, // Drive number (A:)
@@ -40,13 +39,13 @@ int read_sector(uint8_t* buffer, uint32_t lba) {
 void* memset(void* s, int c, size_t n) {
     unsigned char* p = s;
     while (n--) *p++ = (unsigned char)c;
-    return s;
+        return s;
 }
 
 size_t strlen(const char* str) {
     size_t len = 0;
     while (str[len]) len++;
-    return len;
+        return len;
 }
 
 void list_root_dir() {
@@ -82,6 +81,7 @@ int write_sector(const uint8_t* buffer, uint32_t lba) {
 
     return 0;
 }
+
 int create_file(const char* filename) {
     uint8_t sector[SECTOR_SIZE];
     read_sector(sector, ROOT_DIR_SECTOR);
@@ -89,9 +89,7 @@ int create_file(const char* filename) {
 
     for (int i = 0; i < MAX_ROOT_ENTRIES; i++) {
         if (entries[i].filename[0] == 0x00 || entries[i].filename[0] == 0xE5) {
-            memset(&entries[i], 0, sizeof(DirEntry));
-
-            
+            memset(&entries[i], 0, sizeof(DirEntry));            
             memset(entries[i].filename, ' ', 11);
             int len = strlen(filename);
             int dot = -1;
@@ -113,7 +111,6 @@ int create_file(const char* filename) {
             entries[i].start_cluster = 0;
             entries[i].size = 0;
 
-            
             write_sector((uint8_t*)entries, ROOT_DIR_SECTOR);
 
             print("File created.\n");

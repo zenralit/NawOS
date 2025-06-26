@@ -5,11 +5,13 @@
 #define MAX_ROWS 25
 #define MAX_COLS 80
 #define WHITE_ON_BLACK 0x0F
-//uint16_t* VIDEO_MEMORY = (uint16_t*) VGA_ADDRESS;
+#define MAX_COLS 80
+#define MAX_ROWS 25
+#define VIDEO_ADDRESS 0xB8000
+
 static uint16_t* const VIDEO_MEMORY = (uint16_t*)0xB8000;
+extern uint16_t cursor_offset;
 uint16_t cursor_offset = 0;
-
-
 
 void clear_screen() {
      for (int i = 0; i < 80 * 25; i++) {
@@ -47,12 +49,6 @@ void print(const char* str) {
 void print_backspace() {
     put_char('\b');
 }
-
-#define MAX_COLS 80
-#define MAX_ROWS 25
-#define VIDEO_ADDRESS 0xB8000
-
-extern uint16_t cursor_offset;
 
 void update_cursor() {
     uint16_t pos = cursor_offset / 2;

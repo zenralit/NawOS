@@ -10,22 +10,22 @@
 #define PORT_KBD_DATA 0x60
 
 char input_buffer[INPUT_BUFFER_SIZE];
-int input_pos = 0;
-
+char* strstr(const char* haystack, const char* needle);
 char* find_char(const char* str, char ch);
+
 void* memcpy(void* dest, const void* src, size_t n);
 void uint8_to_hex(uint8_t val, char* out);
-int atoi(const char* str);
 void keyboard_handle_interrupt();
-int strcmp(const char* s1, const char* s2);
-char* strstr(const char* haystack, const char* needle);
 void reboot();
+
+int input_pos = 0;
 int strncmp(const char* s1, const char* s2, size_t n);
+int strcmp(const char* s1, const char* s2);
+int atoi(const char* str);
 
 
 
 // -------- keyboard map -------- //
-
 static const char scancode_map[128] = {
     0, 27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
     '\t','q','w','e','r','t','y','u','i','o','p','[',']','\n', 0,
@@ -33,19 +33,18 @@ static const char scancode_map[128] = {
     'z','x','c','v','b','n','m',',','.','/', 0, '*',
     0, ' ', 0,
 };
-
 // -------- keyboard map -------- //
 
 int fs_read_to_buffer(const char* name, const char* ext, char* buffer, int max_len) {
     const char* file_data = fs_read(name, ext);
     if (!file_data) return -1;
-
    
     int i;
+
     for (i = 0; i < max_len - 1 && file_data[i] != '\0'; i++) {
         buffer[i] = file_data[i];
     }
-    buffer[i] = '\0';
+        buffer[i] = '\0';
     return i;
 }
 
@@ -55,9 +54,9 @@ void start_text_editor(const char* name, const char* ext) {
     print(name); print("."); print(ext);
     print("\n[Type text, ESC = exit, F2 = save]\n");
 
-    
     int pos = 0;
-   char buffer[512] = {0};
+    char buffer[512] = {0};
+
     if (fs_read_to_buffer(name, ext, buffer, sizeof(buffer)) < 0) {
         print("File not found or error reading\n");
     } else {
@@ -75,13 +74,11 @@ void start_text_editor(const char* name, const char* ext) {
         uint8_t sc = get_scancode();
         if (sc == 0) continue;
 
-        
         if (sc & 0x80) continue;
 
         char c = scancode_map[sc];
         if (!c) continue;
 
-        
         if (c == 27) {
             break;
         }
@@ -89,15 +86,13 @@ void start_text_editor(const char* name, const char* ext) {
         else if (sc == 60) {
             fs_write(name, ext, buffer);
             print("\nFile saved.\n");
-        }
-        else if (c == '\b') {
+        } else if (c == '\b') {
             if (pos > 0) {
                 pos--;
                 buffer[pos] = '\0';
                 put_char('\b');
             }
-        }
-        else if (c >= 32 && c <= 126) {
+        } else if (c >= 32 && c <= 126) {
             if (pos < 511) {
                 buffer[pos++] = c;
                 buffer[pos] = '\0';
@@ -108,10 +103,6 @@ void start_text_editor(const char* name, const char* ext) {
 
     print("\nExited editor.\n");
 }
-
-
-
-
 
 void process_command(const char* input) {
     if (strcmp(input, "help") == 0) {
@@ -143,9 +134,9 @@ void process_command(const char* input) {
         char ext[4] = {0};
         size_t namelen = dot - nameext;
         if (namelen > 8) namelen = 8;
-        memcpy(name, nameext, namelen);
-        strncpy(ext, dot + 1, 3);
-        ext[3] = '\0';
+            memcpy(name, nameext, namelen);
+            strncpy(ext, dot + 1, 3);
+            ext[3] = '\0';
 
         if (strlen(ext) == 0 || strlen(name) == 0) {
             print("Invalid filename. Use name.ext\n");
@@ -169,14 +160,15 @@ void process_command(const char* input) {
         file[15] = '\0';
 
         const char* dot = find_char(file, '.');
+
         if (dot && dot > file) {
             char name[9] = {0};
             char ext[4] = {0};
-            size_t namelen = dot - file;
+        size_t namelen = dot - file;
             if (namelen > 8) namelen = 8;
-            memcpy(name, file, namelen);
-            strncpy(ext, dot + 1, 3);
-            ext[3] = '\0';
+                memcpy(name, file, namelen);
+                strncpy(ext, dot + 1, 3);
+                ext[3] = '\0';
 
             if (strlen(ext) == 0 || strlen(name) == 0) {
                 print("Invalid filename. Use name.ext\n");
@@ -192,22 +184,21 @@ void process_command(const char* input) {
         print("Usage: wr <text> - <file>\n");
     }
     } else if (strncmp(input, "cat ", 4) == 0) {
-    const char* file = input + 4;
-    const char* dot = find_char(file, '.');
+        const char* file = input + 4;
+        const char* dot = find_char(file, '.');
 
     if (dot && dot > file) {
         char name[8] = { 0 };
         char ext[3] = { 0 };
 
-        size_t namelen = dot - file;
+    size_t namelen = dot - file;
         if (namelen > 8) namelen = 8;
 
-        
         for (size_t i = 0; i < namelen; ++i) {
             name[i] = file[i];
         }
 
-        const char* ext_start = dot + 1;
+    const char* ext_start = dot + 1;
         size_t extlen = strlen(ext_start);
         if (extlen > 3) extlen = 3;
         for (size_t i = 0; i < extlen; ++i) {
@@ -276,8 +267,7 @@ void process_command(const char* input) {
     } else {
         print("Invalid filename. Use name.ext\n");
     }
-    } 
-    else {
+    } else {
         print("Unknown command. Type 'help' for help.\n");
     }
     print("\n> ");
@@ -287,7 +277,6 @@ void process_command(const char* input) {
 
 
 // --------- функции --------- //
-
 
 void handle_input(char c) {
     if (c == '\b' && input_pos > 0) {
@@ -306,7 +295,6 @@ void handle_input(char c) {
 }
 
 void keyboard_handle_scancode(uint8_t scancode) {
-
     if (scancode & 0x80) return;  
     scancode = inb(PORT_KBD_DATA);
     if (scancode & 0x80) return;
@@ -363,11 +351,10 @@ int atoi(const char* str) {
         res = res * 10 + (*str - '0');
         str++;
     }
-    return res;
+  return res;
 }
 
-void keyboard_handle_interrupt() {
-   
+void keyboard_handle_interrupt() {  
     uint8_t scancode = port_byte_in(0x60);
     keyboard_handle_scancode(scancode); 
     port_byte_out(0x20, 0x20); 
@@ -377,7 +364,7 @@ int strcmp(const char* s1, const char* s2) {
     while (*s1 && (*s1 == *s2)) {
         s1++; s2++;
     }
-    return *(unsigned char*)s1 - *(unsigned char*)s2;
+  return *(unsigned char*)s1 - *(unsigned char*)s2;
 }
 
 char* strstr(const char* haystack, const char* needle) {
@@ -387,7 +374,7 @@ char* strstr(const char* haystack, const char* needle) {
             return (char*)haystack;
         }
     }
-    return NULL;
+  return NULL;
 }
 
 void reboot() {
@@ -406,7 +393,5 @@ int strncmp(const char* s1, const char* s2, size_t n) {
             return 0;
         }
     }
-    return 0;
+  return 0;
 }
-
-

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define IDT_ENTRIES 256
+
 struct IDTEntry idt[IDT_ENTRIES];
 struct IDTPtr idt_ptr;
 
@@ -38,6 +39,7 @@ void remap_pic() {
     outb(0x21, 0xFC); 
     outb(0xA1, 0xFF); 
 }
+
 void idt_init()
 {
     remap_pic();

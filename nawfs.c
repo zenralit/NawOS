@@ -1,11 +1,7 @@
 #include "nawfs.h"
 #include "screen.h" 
-
 #include "keyboard.h"
-
-
 #include <string.h> 
-
 #include "nawfs.h"
 #include "disk.h"
 #include "screen.h"
@@ -16,6 +12,7 @@ char file_data[SECTOR_SIZE * (MAX_FILES + 1)];
 int file_count = 0;
 static uint8_t fs_buffer[SECTOR_SIZE];
 int memcmp(const void* s1, const void* s2, size_t n);
+
 void fs_init() {
     asm volatile("cli");
 
@@ -35,7 +32,6 @@ void fs_init() {
             }
         }
     }
-
     asm volatile("sti");
 }
 
@@ -73,14 +69,12 @@ int find_file(const char* name, const char* ext) {
 int fs_create(const char* name, const char* ext) {
     if (file_count >= MAX_FILES) return -1;
     if (find_file(name, ext) >= 0) return -1;
-
     nawfs_entry* e = &entries[file_count];
     memset(e, 0, sizeof(nawfs_entry));
     strncpy(e->name, name, FILENAME_LEN);
     strncpy(e->ext, ext, EXTENSION_LEN);
     e->sector = DATA_START_SECTOR + file_count;
     e->size = 0;
-
     file_count++;
     fs_flush();
     return 0;
@@ -89,11 +83,9 @@ int fs_create(const char* name, const char* ext) {
 int fs_write(const char* name, const char* ext, const char* data) {
     int i = find_file(name, ext);
     if (i < 0) return -1;
-
     size_t len = strlen(data);
     if (len > SECTOR_SIZE) len = SECTOR_SIZE;
     entries[i].size = len;
-
     uint8_t buffer[SECTOR_SIZE];
     memset(buffer, 0, SECTOR_SIZE);
     memcpy(buffer, data, len);
@@ -108,17 +100,16 @@ int fs_write(const char* name, const char* ext, const char* data) {
 
 const char* fs_read(const char* name, const char* ext) {
     for (int i = 0; i < file_count; ++i) {
-        
-        if (memcmp(entries[i].name, name, 8) == 0 && memcmp(entries[i].ext, ext, 3) == 0) {
-            static char buffer[512];
-            if (disk_read_sector(entries[i].sector, (uint8_t*)buffer) == 0) {
-                buffer[entries[i].size] = '\0'; 
-                return buffer;
-            } else {
-                return NULL;
-            }
+                if (memcmp(entries[i].name, name, 8) == 0 && memcmp(entries[i].ext, ext, 3) == 0) {
+                    static char buffer[512];
+                        if (disk_read_sector(entries[i].sector, (uint8_t*)buffer) == 0) {
+                            buffer[entries[i].size] = '\0'; 
+                                return buffer;
+                            } else {
+                        return NULL;
+                    }
+                }
         }
-    }
     return NULL;
 }
 
@@ -140,8 +131,6 @@ int fs_delete(const char* name, const char* ext) {
 }
 
 void fs_list() {
-
-    
        for (int i = 0; i < file_count; i++) {
         print(" - ");
         print(entries[i].name);
@@ -184,7 +173,6 @@ void itoa(int value, char* str) {
     char* p = str;
     char buf[10];
     int i = 0;
-
     if (value == 0) {
         *p++ = '0';
         *p = 0;
@@ -197,7 +185,7 @@ void itoa(int value, char* str) {
     }
 
     while (i > 0) *p++ = buf[--i];
-    *p = 0;
+        *p = 0;
 }
 int memcmp(const void* s1, const void* s2, size_t n) {
     const unsigned char* p1 = s1;
