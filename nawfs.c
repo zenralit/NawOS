@@ -10,7 +10,7 @@
 nawfs_entry entries[MAX_FILES];
 char file_data[SECTOR_SIZE * (MAX_FILES + 1)];
 int file_count = 0;
-static uint8_t fs_buffer[SECTOR_SIZE];
+ uint8_t fs_buffer[SECTOR_SIZE];
 int memcmp(const void* s1, const void* s2, size_t n);
 
 void fs_init() {

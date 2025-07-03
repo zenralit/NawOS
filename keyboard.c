@@ -10,22 +10,11 @@
 #define PORT_KBD_DATA 0x60
 
 char input_buffer[INPUT_BUFFER_SIZE];
-char* strstr(const char* haystack, const char* needle);
-char* find_char(const char* str, char ch);
-
-void* memcpy(void* dest, const void* src, size_t n);
-void uint8_to_hex(uint8_t val, char* out);
-void keyboard_handle_interrupt();
-void reboot();
-
 int input_pos = 0;
-int strncmp(const char* s1, const char* s2, size_t n);
-int strcmp(const char* s1, const char* s2);
-int atoi(const char* str);
-
-
+uint8_t key_pressed[128] = {0};
 
 // -------- keyboard map -------- //
+
 static const char scancode_map[128] = {
     0, 27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
     '\t','q','w','e','r','t','y','u','i','o','p','[',']','\n', 0,
@@ -35,74 +24,6 @@ static const char scancode_map[128] = {
 };
 // -------- keyboard map -------- //
 
-int fs_read_to_buffer(const char* name, const char* ext, char* buffer, int max_len) {
-    const char* file_data = fs_read(name, ext);
-    if (!file_data) return -1;
-   
-    int i;
-
-    for (i = 0; i < max_len - 1 && file_data[i] != '\0'; i++) {
-        buffer[i] = file_data[i];
-    }
-        buffer[i] = '\0';
-    return i;
-}
-
-void start_text_editor(const char* name, const char* ext) {
-    clear_screen();
-    print("Editing: ");
-    print(name); print("."); print(ext);
-    print("\n[Type text, ESC = exit, F2 = save]\n");
-
-    int pos = 0;
-    char buffer[512] = {0};
-
-    if (fs_read_to_buffer(name, ext, buffer, sizeof(buffer)) < 0) {
-        print("File not found or error reading\n");
-    } else {
-        print("Loaded file content:\n");
-        print(buffer);
-    }
-    while (buffer[pos] != '\0' && pos < 511) {
-        put_char(buffer[pos]);
-        pos++;
-    }
-
-    update_cursor();
-
-    while (1) {
-        uint8_t sc = get_scancode();
-        if (sc == 0) continue;
-
-        if (sc & 0x80) continue;
-
-        char c = scancode_map[sc];
-        if (!c) continue;
-
-        if (c == 27) {
-            break;
-        }
-       
-        else if (sc == 60) {
-            fs_write(name, ext, buffer);
-            print("\nFile saved.\n");
-        } else if (c == '\b') {
-            if (pos > 0) {
-                pos--;
-                buffer[pos] = '\0';
-                put_char('\b');
-            }
-        } else if (c >= 32 && c <= 126) {
-            if (pos < 511) {
-                buffer[pos++] = c;
-                buffer[pos] = '\0';
-                put_char(c);
-            }
-        }
-    }
-
-    print("\nExited editor.\n");
-}
 
 void process_command(const char* input) {
     if (strcmp(input, "help") == 0) {
@@ -117,6 +38,7 @@ void process_command(const char* input) {
         print("cat <name.ext> - Show file content\n");
         print("rm <name.ext> - Delete file\n");
     // print("readsec <num> - Read disk sector\n");
+        print("edit <name.ext - text editor\n>");
     } else if (strcmp(input, "clear") == 0) {
         clear_screen();
     } else if (strcmp(input, "reboot") == 0) {
@@ -394,4 +316,83 @@ int strncmp(const char* s1, const char* s2, size_t n) {
         }
     }
   return 0;
+}
+int fs_read_to_buffer(const char* name, const char* ext, char* buffer, int max_len) {
+    const char* file_data = fs_read(name, ext);
+    if (!file_data) return -1;
+   
+    int i;
+
+    for (i = 0; i < max_len - 1 && file_data[i] != '\0'; i++) {
+        buffer[i] = file_data[i];
+    }
+        buffer[i] = '\0';
+    return i;
+}
+
+void start_text_editor(const char* name, const char* ext) {
+    clear_screen();
+    print("Editing: ");
+    print(name); print("."); print(ext);
+    print("\n[Type text, ESC = exit, F2 = save]\n");
+
+    int pos = 0;
+    char buffer[512] = {0};
+
+    int loaded = fs_read_to_buffer(name, ext, buffer, sizeof(buffer));
+    if (loaded >= 0) {
+        print("file content:\n");
+        for (int i = 0; buffer[i] != '\0' && i < 511; i++) {
+            put_char(buffer[i]);
+            pos++;
+        }
+    } else {
+        print("New file\n");
+    }
+
+    update_cursor();
+
+    uint8_t key_down[128] = {0};
+
+    while (1) {
+        uint8_t sc = get_scancode();
+        if (sc == 0) continue;
+
+        if (sc & 0x80) {
+            
+            key_down[sc & 0x7F] = 0;
+            continue;
+        }
+
+        if (key_down[sc]) continue;  
+        key_down[sc] = 1;
+
+        // F2
+        if (sc == 60) {
+            fs_write(name, ext, buffer);
+            print("\nFile saved\n");
+            continue;
+        }
+
+        char c = scancode_map[sc];
+        if (!c) continue;
+
+        if (c == 27) { // ESC
+            break;
+        } else if (c == '\b') {
+            if (pos > 0) {
+                pos--;
+                buffer[pos] = '\0';
+                put_char('\b');
+            }
+        } else if (c >= 32 && c <= 126) {
+            if (pos < 511) {
+                buffer[pos++] = c;
+                buffer[pos] = '\0';
+                put_char(c);
+            }
+        }
+    }
+
+    print("\nExited editor\n");
 }

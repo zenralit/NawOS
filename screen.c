@@ -59,9 +59,14 @@ void update_cursor() {
 }
 
 uint8_t get_scancode() {
+    // uint8_t scancode;
+    // do {
+    //     asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
+    // } while (scancode >= 128);  
+    // return scancode;
+
     uint8_t scancode;
-    do {
-        asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
-    } while (scancode >= 128);  
+    asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
     return scancode;
+    
 }
