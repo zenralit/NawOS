@@ -208,8 +208,9 @@ void process_command(const char* input) {
         const char* expr = input + 4;
         while (*expr == ' ') expr++;
         if (*expr == '\0') {
-            print("Interactive calculator is not implemented yet.\n");
-            // TODO
+           if (*expr == '\0') {
+            print("calculator is not implemented yet.\n");
+            // TODO need added full calculator
             // tyt budet calc
         } else {            double result = eval_expr(expr);
            print(expr); print(" = ");
