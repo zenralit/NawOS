@@ -5,8 +5,6 @@
 #define MAX_ROWS 25
 #define MAX_COLS 80
 #define WHITE_ON_BLACK 0x0F
-#define MAX_COLS 80
-#define MAX_ROWS 25
 #define VIDEO_ADDRESS 0xB8000
 
 static uint16_t* const VIDEO_MEMORY = (uint16_t*)0xB8000;
@@ -69,4 +67,38 @@ uint8_t get_scancode() {
     asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
     return scancode;
     
+}
+void print_double(double value) {
+    int int_part = (int)value;
+    int frac_part = (int)((value - int_part) * 10000); 
+    print_int(int_part);
+    print(".");
+    if (frac_part < 0) frac_part = -frac_part;
+    if (frac_part < 1000) print("0");  
+    if (frac_part < 100) print("0");
+    if (frac_part < 10) print("0");
+    print_int(frac_part);
+}
+void print_int(int num) {
+    char buf[12]; 
+    int i = 0;
+
+    if (num == 0) {
+        put_char('0');
+        return;
+    }
+
+    if (num < 0) {
+        put_char('-');
+        num = -num;
+    }
+
+    while (num > 0) {
+        buf[i++] = '0' + (num % 10);
+        num /= 10;
+    }
+
+    while (i--) {
+        put_char(buf[i]);
+    }
 }

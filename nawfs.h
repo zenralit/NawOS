@@ -20,7 +20,6 @@ typedef struct {
     char reserved[17];
 } __attribute__((packed)) nawfs_entry;
 
-
 void fs_init();
 void fs_list();
 int fs_create(const char* name, const char* ext);

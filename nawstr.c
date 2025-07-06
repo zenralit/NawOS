@@ -1,4 +1,4 @@
-
+// string.c
 #include "nawstring.h"
 
 char* strncpy(char* dest, const char* src, unsigned int n) {

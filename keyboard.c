@@ -3,6 +3,7 @@
 #include "ports.h"
 #include "nawfs.h"
 #include "disk.h"
+#include "math.h"
 #include <stddef.h>
 
 #define INPUT_BUFFER_SIZE 256
@@ -12,14 +13,23 @@
 char input_buffer[INPUT_BUFFER_SIZE];
 int input_pos = 0;
 uint8_t key_pressed[128] = {0};
+int shift_pressed = 0;
+uint8_t key_down[256] = {0};
+
 
 // -------- keyboard map -------- //
-
 static const char scancode_map[128] = {
     0, 27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
     '\t','q','w','e','r','t','y','u','i','o','p','[',']','\n', 0,
     'a','s','d','f','g','h','j','k','l',';','\'','`', 0, '\\',
     'z','x','c','v','b','n','m',',','.','/', 0, '*',
+    0, ' ', 0,
+};
+static const char scancode_shift_map[128] = {
+    0, 27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',
+    '\t','Q','W','E','R','T','Y','U','I','O','P','{','}','\n', 0,
+    'A','S','D','F','G','H','J','K','L',':','"','~', 0, '|',
+    'Z','X','C','V','B','N','M','<','>','?', 0, '*',
     0, ' ', 0,
 };
 // -------- keyboard map -------- //
@@ -38,7 +48,8 @@ void process_command(const char* input) {
         print("cat <name.ext> - Show file content\n");
         print("rm <name.ext> - Delete file\n");
     // print("readsec <num> - Read disk sector\n");
-        print("edit <name.ext - text editor\n>");
+        print("swg <name.ext> - text editor\n");
+        print("calc <math exp> - solve a mathematical expression\n");
     } else if (strcmp(input, "clear") == 0) {
         clear_screen();
     } else if (strcmp(input, "reboot") == 0) {
@@ -48,6 +59,8 @@ void process_command(const char* input) {
         print("\n");
     } else if (strcmp(input, "ls") == 0) {
         fs_list();
+    } else if (strcmp(input, "swaga") == 0){
+        print("swaga prisutstvuet");
     } else if (strncmp(input, "cf ", 3) == 0) {
     const char* nameext = input + 3;
     const char* dot = find_char(nameext, '.');
@@ -189,7 +202,24 @@ void process_command(const char* input) {
     } else {
         print("Invalid filename. Use name.ext\n");
     }
-    } else {
+    }
+    else if (strncmp(input, "calc", 4) == 0) {
+    if (strncmp(input, "calc", 4) == 0) {
+        const char* expr = input + 4;
+        while (*expr == ' ') expr++;
+        if (*expr == '\0') {
+            print("Interactive calculator is not implemented yet.\n");
+            // TODO
+            // tyt budet calc
+        } else {            double result = eval_expr(expr);
+           print(expr); print(" = ");
+            print_double(result); 
+            print("\n");
+        }
+    }
+    // S W A G A - swaga,  уменя её навалом 
+    } 
+    else {
         print("Unknown command. Type 'help' for help.\n");
     }
     print("\n> ");
@@ -216,28 +246,35 @@ void handle_input(char c) {
     }
 }
 
-void keyboard_handle_scancode(uint8_t scancode) {
-    if (scancode & 0x80) return;  
-    scancode = inb(PORT_KBD_DATA);
-    if (scancode & 0x80) return;
+void keyboard_handle_scancode() {
+    uint8_t sc = inb(PORT_KBD_DATA);
+    if (sc == 0) return;
 
-    char c = scancode_map[scancode];
-    if (!c) return;
+    if (sc == 42 || sc == 54) {
+        shift_pressed = 1;
+        return;
+    } else if (sc == (42 | 0x80) || sc == (54 | 0x80)) {
+        shift_pressed = 0;
+        return;
+    }
 
-    if (c == '\n') {
-        input_buffer[input_pos] = '\0';
-        print("\n");
-        process_command(input_buffer);
-    } else if (c == '\b') {
-        if (input_pos > 0) {
-            input_pos--;
-            put_char('\b');
+    
+    if (sc & 0x80) {
+        key_down[sc & 0x7F] = 0;
+        return;
+    }
+
+    if (key_down[sc] == 0) {
+        key_down[sc] = 1;
+        uint8_t base = sc & 0x7F;
+        char c = shift_pressed ? scancode_shift_map[base] : scancode_map[base];
+
+        if (c) {
+            handle_input(c);
         }
-    } else if (input_pos < MAX_INPUT - 1) {
-        input_buffer[input_pos++] = c;
-        put_char(c);
     }
 }
+
 
 void keyboard_init() {
     uint8_t mask = inb(0x21);
@@ -358,25 +395,48 @@ void start_text_editor(const char* name, const char* ext) {
         uint8_t sc = get_scancode();
         if (sc == 0) continue;
 
+       
         if (sc & 0x80) {
+            uint8_t key = sc & 0x7F;
+            key_down[key] = 0;
+
             
-            key_down[sc & 0x7F] = 0;
+            if (key == 42 || key == 54) {
+                shift_pressed = 0;
+            }
+            continue;
+        }
+
+        
+        if (sc == 42 || sc == 54) {
+            shift_pressed = 1;
+            key_down[sc] = 1;
             continue;
         }
 
         if (key_down[sc]) continue;  
         key_down[sc] = 1;
 
-        // F2
+        // F2 
         if (sc == 60) {
             fs_write(name, ext, buffer);
             print("\nFile saved\n");
             continue;
         }
 
-        char c = scancode_map[sc];
+        
+        char c = shift_pressed ? scancode_shift_map[sc] : scancode_map[sc];
         if (!c) continue;
 
+        if (sc == 28) { //enter
+            if (pos < 510) {
+                buffer[pos++] = '\n';
+                buffer[pos] = '\0';
+                print("\n");
+            }
+            continue;
+        }
+        
         if (c == 27) { // ESC
             break;
         } else if (c == '\b') {

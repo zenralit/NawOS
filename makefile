@@ -5,9 +5,12 @@ LD   = ld
 CFLAGS  = -m32 -ffreestanding -O2 -Wall
 LDFLAGS = -m elf_i386
 
-OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o
+OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o math.o
 
 all: os-image.bin
+
+math.o: math.c math.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 disk.0: disk.c disk.h
 	$(CC) $(CFLAGS) -c $< -o $@
