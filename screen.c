@@ -1,6 +1,7 @@
 #include "screen.h"
 #include "ports.h"
 #include <stdint.h>
+
 #define VGA_ADDRESS 0xB8000
 #define MAX_ROWS 25
 #define MAX_COLS 80
@@ -10,6 +11,33 @@
 static uint16_t* const VIDEO_MEMORY = (uint16_t*)0xB8000;
 extern uint16_t cursor_offset;
 uint16_t cursor_offset = 0;
+int cursor_x = 0;
+int cursor_y = 0;
+
+void move_cursor_left() {
+    if (cursor_x > 0) {
+        cursor_x--;
+        update_cursor();
+    } else if (cursor_y > 0) {
+        cursor_y--;
+        cursor_x = 79;
+        update_cursor();
+    }
+    update_cursor();
+}
+
+void move_cursor_right() {
+    if (cursor_x < 79) {
+        cursor_x++;
+        update_cursor();
+    } else {
+        cursor_x = 0;
+        cursor_y++;
+        update_cursor();
+    }
+    update_cursor();
+}
+
 
 void clear_screen() {
      for (int i = 0; i < 80 * 25; i++) {
@@ -63,11 +91,18 @@ uint8_t get_scancode() {
     // } while (scancode >= 128);  
     // return scancode;
 
-    uint8_t scancode;
-    asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
-    return scancode;
-    
+    // uint8_t scancode;
+    // asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
+    // return scancode;
+
+    uint8_t sc = inb(0x60);
+    if (sc == 0xE0) {
+        uint8_t next = inb(0x60);
+        return (0xE0 << 8) | next;
+    }
+    return sc;
 }
+
 void print_double(double value) {
     int int_part = (int)value;
     int frac_part = (int)((value - int_part) * 10000); 
@@ -101,4 +136,16 @@ void print_int(int num) {
     while (i--) {
         put_char(buf[i]);
     }
+}
+void print_hex(uint16_t value) {
+    char hex_digits[] = "0123456789ABCDEF";
+    char output[7]; 
+    output[0] = '0';
+    output[1] = 'x';
+    output[2] = hex_digits[(value >> 12) & 0xF];
+    output[3] = hex_digits[(value >> 8) & 0xF];
+    output[4] = hex_digits[(value >> 4) & 0xF];
+    output[5] = hex_digits[value & 0xF];
+    output[6] = '\0';
+    print(output);
 }

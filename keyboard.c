@@ -208,26 +208,59 @@ void process_command(const char* input) {
         const char* expr = input + 4;
         while (*expr == ' ') expr++;
         if (*expr == '\0') {
-           if (*expr == '\0') {
             print("calculator is not implemented yet.\n");
             // TODO need added full calculator
             // tyt budet calc
-        } else {            double result = eval_expr(expr);
-           print(expr); print(" = ");
+        } else {         
+            double result = eval_expr(expr);
+            print(expr); print(" = ");
             print_double(result); 
             print("\n");
         }
     }
     // S W A G A - swaga,  уменя её навалом 
-    } 
-    else {
+    } else if (strncmp(input, "lelya", 5) == 0) {
+
+    uint8_t key_down[128] = {0};  
+
+    while (1) { 
+        uint16_t sc = get_scancode();
+
+        if (sc == 0) continue;
+
+        if (sc == 0xE0) {
+            uint8_t next = get_scancode();
+            uint16_t full = (0xE000 | next);
+            print_hex(full);
+            print("\n");
+            if (next == 0x01) break; 
+            continue;
+        }
+
+        if (sc & 0x80) {
+            uint8_t key = sc & 0x7F;
+            key_down[key] = 0;
+            continue;
+        }
+
+        if (key_down[sc]) continue; 
+        key_down[sc] = 1;
+
+        print_hex(sc);
+        print("\n");
+
+        if (sc == 1) break; 
+    }
+} else {
         print("Unknown command. Type 'help' for help.\n");
     }
     print("\n> ");
     input_pos = 0;
     input_buffer[0] = 0;
 }
-
+// need created prog lang. first meybe name it`s "ley" like a "lua"
+// second - ait 
+// Yad 
 
 // --------- функции --------- //
 
@@ -355,18 +388,7 @@ int strncmp(const char* s1, const char* s2, size_t n) {
     }
   return 0;
 }
-int fs_read_to_buffer(const char* name, const char* ext, char* buffer, int max_len) {
-    const char* file_data = fs_read(name, ext);
-    if (!file_data) return -1;
-   
-    int i;
 
-    for (i = 0; i < max_len - 1 && file_data[i] != '\0'; i++) {
-        buffer[i] = file_data[i];
-    }
-        buffer[i] = '\0';
-    return i;
-}
 
 void start_text_editor(const char* name, const char* ext) {
     clear_screen();
@@ -391,45 +413,64 @@ void start_text_editor(const char* name, const char* ext) {
     update_cursor();
 
     uint8_t key_down[128] = {0};
+    int shift_pressed = 0;
 
     while (1) {
-        uint8_t sc = get_scancode();
-        if (sc == 0) continue;
+        uint16_t full_sc = get_scancode();
+        if (full_sc == 0) continue;
 
-       
+        uint8_t sc = full_sc & 0xFF;
+        //uint8_t ext = full_sc >> 8;
+        uint8_t pref = full_sc >> 8;
+
+        if (pref == 0xE0) {
+            if (sc == 0x4B) { // ←
+                if (pos > 0) {
+                    pos--;
+                    move_cursor_left();
+                }
+            } else if (sc == 0x4D) { // →
+                if (buffer[pos] != '\0' && pos < 511) {
+                    pos++;
+                    move_cursor_right();
+                }
+            }
+            continue;
+        }
+
         if (sc & 0x80) {
             uint8_t key = sc & 0x7F;
             key_down[key] = 0;
 
-            
-            if (key == 42 || key == 54) {
+            if (key == 42 || key == 54) { // Shift 
                 shift_pressed = 0;
             }
             continue;
         }
 
-        
-        if (sc == 42 || sc == 54) {
+        if (sc == 42 || sc == 54) { // Shift 
             shift_pressed = 1;
             key_down[sc] = 1;
             continue;
         }
 
-        if (key_down[sc]) continue;  
+        if (key_down[sc]) continue;
         key_down[sc] = 1;
 
-        // F2 
-        if (sc == 60) {
+        if (sc == 60) { // F2
             fs_write(name, ext, buffer);
             print("\nFile saved\n");
             continue;
         }
 
-        
+        if (sc == 1) { // ESC
+            break;
+        }
+
         char c = shift_pressed ? scancode_shift_map[sc] : scancode_map[sc];
         if (!c) continue;
 
-        if (sc == 28) { //enter
+        if (sc == 28) {
             if (pos < 510) {
                 buffer[pos++] = '\n';
                 buffer[pos] = '\0';
@@ -437,16 +478,18 @@ void start_text_editor(const char* name, const char* ext) {
             }
             continue;
         }
-        
-        if (c == 27) { // ESC
-            break;
-        } else if (c == '\b') {
+
+        if (c == '\b') {
             if (pos > 0) {
                 pos--;
                 buffer[pos] = '\0';
                 put_char('\b');
             }
-        } else if (c >= 32 && c <= 126) {
+            continue;
+        }
+
+
+        if (c >= 32 && c <= 126) {
             if (pos < 511) {
                 buffer[pos++] = c;
                 buffer[pos] = '\0';

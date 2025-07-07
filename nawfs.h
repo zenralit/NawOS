@@ -35,5 +35,6 @@ unsigned int strlen(const char* str);
 int strcmp(const char* s1, const char* s2);
 extern nawfs_entry entries[MAX_FILES];
 extern int file_count;
+int fs_read_to_buffer();
 
 #endif

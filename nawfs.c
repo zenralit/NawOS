@@ -66,6 +66,19 @@ int find_file(const char* name, const char* ext) {
     return -1;
 }
 
+int fs_read_to_buffer(const char* name, const char* ext, char* buffer, int max_len) {
+    const char* file_data = fs_read(name, ext);
+    if (!file_data) return -1;
+   
+    int i;
+
+    for (i = 0; i < max_len - 1 && file_data[i] != '\0'; i++) {
+        buffer[i] = file_data[i];
+    }
+        buffer[i] = '\0';
+    return i;
+}
+
 int fs_create(const char* name, const char* ext) {
     if (file_count >= MAX_FILES) return -1;
     if (find_file(name, ext) >= 0) return -1;
