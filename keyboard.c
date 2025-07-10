@@ -221,37 +221,37 @@ void process_command(const char* input) {
     // S W A G A - swaga,  уменя её навалом 
     } else if (strncmp(input, "lelya", 5) == 0) {
 
-    uint8_t key_down[128] = {0};  
+        uint8_t key_down[128] = {0};  
 
-    while (1) { 
-        uint16_t sc = get_scancode();
+        while (1) { 
+            uint16_t sc = get_scancode();
 
-        if (sc == 0) continue;
+            if (sc == 0) continue;
 
-        if (sc == 0xE0) {
-            uint8_t next = get_scancode();
-            uint16_t full = (0xE000 | next);
-            print_hex(full);
+            if (sc == 0xE0) {
+                uint8_t next = get_scancode();
+                uint16_t full = (0xE000 | next);
+                print_hex(full);
+                print("\n");
+                if (next == 0x01) break; 
+                continue;
+            }
+
+            if (sc & 0x80) {
+                uint8_t key = sc & 0x7F;
+                key_down[key] = 0;
+                continue;
+            }
+
+            if (key_down[sc]) continue; 
+            key_down[sc] = 1;
+
+            print_hex(sc);
             print("\n");
-            if (next == 0x01) break; 
-            continue;
+
+            if (sc == 1) break; 
         }
-
-        if (sc & 0x80) {
-            uint8_t key = sc & 0x7F;
-            key_down[key] = 0;
-            continue;
-        }
-
-        if (key_down[sc]) continue; 
-        key_down[sc] = 1;
-
-        print_hex(sc);
-        print("\n");
-
-        if (sc == 1) break; 
-    }
-} else {
+        } else {
         print("Unknown command. Type 'help' for help.\n");
     }
     print("\n> ");
@@ -404,7 +404,7 @@ void start_text_editor(const char* name, const char* ext) {
         print("file content:\n");
         for (int i = 0; buffer[i] != '\0' && i < 511; i++) {
             put_char(buffer[i]);
-            pos++;
+            //pos++;
         }
     } else {
         print("New file\n");
@@ -416,28 +416,25 @@ void start_text_editor(const char* name, const char* ext) {
     int shift_pressed = 0;
 
     while (1) {
-        uint16_t full_sc = get_scancode();
-        if (full_sc == 0) continue;
+ uint16_t full_sc = get_scancode();
+    if (full_sc == 0) continue;
 
-        uint8_t sc = full_sc & 0xFF;
-        //uint8_t ext = full_sc >> 8;
-        uint8_t pref = full_sc >> 8;
+    uint8_t sc = full_sc & 0xFF;
+   // uint8_t pref = full_sc >> 8;
 
-        if (pref == 0xE0) {
-            if (sc == 0x4B) { // ←
-                if (pos > 0) {
-                    pos--;
-                    move_cursor_left();
-                }
-            } else if (sc == 0x4D) { // →
-                if (buffer[pos] != '\0' && pos < 511) {
-                    pos++;
-                    move_cursor_right();
-                }
-            }
-            continue;
+    if (full_sc == 0xE04B) { // ←
+        if (pos > 0) {
+            pos--;
+            set_cursor_offset(pos);
         }
-
+        continue;
+    } else if (full_sc == 0xE04D) { // →
+        if (buffer[pos] != '\0' && pos < 511) {
+            pos++;
+            set_cursor_offset(pos);
+        }
+        continue;
+    }
         if (sc & 0x80) {
             uint8_t key = sc & 0x7F;
             key_down[key] = 0;

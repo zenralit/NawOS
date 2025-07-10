@@ -14,28 +14,29 @@ uint16_t cursor_offset = 0;
 int cursor_x = 0;
 int cursor_y = 0;
 
+int16_t get_cursor_offset() {
+    port_byte_out(0x3D4, 14);
+    uint16_t offset = port_byte_in(0x3D5) << 8;
+    port_byte_out(0x3D4, 15);
+    offset += port_byte_in(0x3D5);
+    return offset;
+}
+
+void set_cursor_offset(uint16_t offset) {
+    port_byte_out(0x3D4, 14);
+    port_byte_out(0x3D5, (offset >> 8) & 0xFF);
+    port_byte_out(0x3D4, 15);
+    port_byte_out(0x3D5, offset & 0xFF);
+}
+
 void move_cursor_left() {
-    if (cursor_x > 0) {
-        cursor_x--;
-        update_cursor();
-    } else if (cursor_y > 0) {
-        cursor_y--;
-        cursor_x = 79;
-        update_cursor();
-    }
-    update_cursor();
+    uint16_t offset = get_cursor_offset();
+    if (offset > 0) set_cursor_offset(offset - 1);
 }
 
 void move_cursor_right() {
-    if (cursor_x < 79) {
-        cursor_x++;
-        update_cursor();
-    } else {
-        cursor_x = 0;
-        cursor_y++;
-        update_cursor();
-    }
-    update_cursor();
+    uint16_t offset = get_cursor_offset();
+    if (offset < 80 * 25 - 1) set_cursor_offset(offset + 1);
 }
 
 

@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "screen.h"
+#include "rtl8139.h"
 #include "idt.h"
 #include "keyboard.h"
 #include "ports.h"
@@ -19,6 +20,7 @@ void kernel_main() {
     idt_init();
     keyboard_init();
     fs_init();
+    rtl8139_init();
 
     asm volatile("sti");
 

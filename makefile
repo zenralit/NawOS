@@ -5,10 +5,16 @@ LD   = ld
 CFLAGS  = -m32 -ffreestanding -O2 -Wall
 LDFLAGS = -m elf_i386
 
-OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o math.o
+OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o math.o pci.o rtl8139.o
 
 all: os-image.bin
 
+rtl8139.o: rtl8139.c rtl8139.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+pci.o: pci.c pci.h
+	$(CC) $(CFLAGS) -c $< -o $@
+	
 math.o: math.c math.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -58,7 +64,11 @@ os-image.bin: bootloader.bin kernel.bin
 	cat bootloader.bin kernel.bin > $@
 
 run: os-image.bin
-	qemu-system-i386 -drive file=os-image.bin,format=raw,index=0,if=floppy \
-	-drive file=nawfs.img,format=raw,if=ide,bus=0,unit=0 -net none
+	qemu-system-i386 \
+	-drive file=os-image.bin,format=raw,index=0,if=floppy \
+	-drive file=nawfs.img,format=raw,if=ide,bus=0,unit=0 \
+	-netdev user,id=net0 \
+	-device rtl8139,netdev=net0 \
+	-serial mon:stdio 
 clean:
 	rm -f *.o *.bin os-image.bin

@@ -2,9 +2,6 @@ int is_digit(char c) {
     return c >= '0' && c <= '9';
 }
 
-int is_space(char c) {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-}
 double eval_expr(const char* expr) {
     double result = 0;
     double current = 0;
@@ -50,4 +47,7 @@ double eval_expr(const char* expr) {
     result += current;
     
     return result;
+}
+int is_space(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
