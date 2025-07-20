@@ -5,6 +5,7 @@
 #include "disk.h"
 #include "math.h"
 #include <stddef.h>
+#include "ip.h"
 
 #define INPUT_BUFFER_SIZE 256
 #define MAX_INPUT 128
@@ -48,7 +49,7 @@ void process_command(const char* input) {
         print("cat <name.ext> - Show file content\n");
         print("rm <name.ext> - Delete file\n");
     // print("readsec <num> - Read disk sector\n");
-        print("swg <name.ext> - text editor\n");
+        print("edit <name.ext> - text editor\n");
         print("calc <math exp> - solve a mathematical expression\n");
     } else if (strcmp(input, "clear") == 0) {
         clear_screen();
@@ -251,7 +252,17 @@ void process_command(const char* input) {
 
             if (sc == 1) break; 
         }
-        } else {
+        }
+        else if (strcmp(input, "ifconfig") == 0) {
+        print("IP Address: ");
+        for (int i = 0; i < 4; i++) {
+            print_dec(naw_ip_address[i]);
+            
+            if (i < 3) print(".");
+        }
+        print_ip();
+        print("\n");
+    } else {
         print("Unknown command. Type 'help' for help.\n");
     }
     print("\n> ");
@@ -261,7 +272,7 @@ void process_command(const char* input) {
 // need created prog lang. first meybe name it`s "ley" like a "lua"
 // second - ait 
 // Yad 
-
+//nasway
 // --------- функции --------- //
 
 void handle_input(char c) {
@@ -484,7 +495,6 @@ void start_text_editor(const char* name, const char* ext) {
             }
             continue;
         }
-
 
         if (c >= 32 && c <= 126) {
             if (pos < 511) {

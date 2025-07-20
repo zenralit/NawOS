@@ -14,6 +14,9 @@ struct IDTPtr idt_ptr;
 extern void load_idt_register(struct IDTPtr*);
 extern void irq1_handler(); 
 extern void irq0_handler(); 
+extern void irq11_handler();
+
+//set_idt_gate(0x2B, (uint32_t)irq11_handler);
 
 void set_idt_gate(int n, uint32_t handler) {
     idt[n].low_offset = handler & 0xFFFF;
@@ -43,12 +46,17 @@ void remap_pic() {
 void idt_init()
 {
     remap_pic();
-
     set_idt_gate(32, (uint32_t)irq0); 
     set_idt_gate(33, (uint32_t)irq1); 
+    set_idt_gate(43, (uint32_t)irq11);
 
     idt_ptr.limit = sizeof(idt) - 1;
     idt_ptr.base = (uint32_t)&idt;
 
     load_idt_register(&idt_ptr);
+}
+
+void send_eoi() {
+    outb(0x20, 0x20); 
+    outb(0xA0, 0x20);
 }

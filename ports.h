@@ -26,8 +26,17 @@ void port_byte_out(uint16_t port, uint8_t data);
 uint16_t port_word_in(uint16_t port);
 void port_word_out(uint16_t port, uint16_t data);
 
-uint32_t inl(uint16_t port);
-void outl(uint16_t port, uint32_t val);
+
+static inline uint32_t inl(uint16_t port) {
+    uint32_t val;
+    __asm__ volatile ("inl %1, %0" : "=a"(val) : "Nd"(port));
+    return val;
+}
+
+static inline void outl(uint16_t port, uint32_t val) {
+    __asm__ volatile ("outl %0, %1" : : "a"(val), "Nd"(port));
+}
+
 
 #define ATA_PRIMARY_IO 0x1F0
 #define ATA_MASTER     0xE0

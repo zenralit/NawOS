@@ -19,6 +19,8 @@ void print_int(int num);
 void print_hex(uint16_t value);
 int16_t get_cursor_offset();
 void set_cursor_offset(uint16_t offset);
+void print_dec(uint32_t num);
+void print_ip();
 
 #endif
 

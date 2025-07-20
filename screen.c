@@ -1,6 +1,7 @@
 #include "screen.h"
 #include "ports.h"
 #include <stdint.h>
+#include "ip.h"
 
 #define VGA_ADDRESS 0xB8000
 #define MAX_ROWS 25
@@ -149,4 +150,32 @@ void print_hex(uint16_t value) {
     output[5] = hex_digits[value & 0xF];
     output[6] = '\0';
     print(output);
+}
+void print_dec(uint32_t num) {
+    char buffer[12];
+    int i = 0;
+
+    if (num == 0) {
+        print("0");
+        return;
+    }
+
+    while (num > 0) {
+        buffer[i++] = '0' + (num % 10);
+        num /= 10;
+    }
+
+    for (i--; i >= 0; i--) {
+        put_char(buffer[i]);
+    }
+}
+
+void print_ip() {
+    print_hex(naw_ip_address[0]);
+    print(".");
+    print_hex(naw_ip_address[1]);
+    print(".");
+    print_hex(naw_ip_address[2]);
+    print(".");
+    print_hex(naw_ip_address[3]);
 }

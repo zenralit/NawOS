@@ -5,9 +5,18 @@ LD   = ld
 CFLAGS  = -m32 -ffreestanding -O2 -Wall
 LDFLAGS = -m elf_i386
 
-OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o math.o pci.o rtl8139.o
+OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o math.o pci.o rtl8139.o net.o dhcp.o ip.o irq11.o
 
 all: os-image.bin
+
+ip.p: ip.c ip.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+dhcp.0: dhcp.c dhcp.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+net.0: net.c net.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 rtl8139.o: rtl8139.c rtl8139.h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -23,6 +32,9 @@ disk.0: disk.c disk.h
 
 nawfs.o: nawfs.c nawfs.h ports.h screen.h keyboard.h
 	$(CC) $(CFLAGS) -c nawfs.c -o $@
+
+irq11.o: irq11.asm
+	$(AS) -f elf32 $< -o $@
 
 irq0.o: irq0.asm
 	$(AS) -f elf32 $< -o $@

@@ -5,8 +5,9 @@
 
 #include <stdint.h>
 
-extern void irq0();
-extern void irq1();
+extern void irq0(); 
+extern void irq1(); 
+extern void irq11();
 
 struct IDTPtr {
     uint16_t limit;
@@ -22,9 +23,7 @@ struct IDTEntry {
 } __attribute__((packed));
 
 
-extern void irq0(); 
-extern void irq1(); 
-
+void send_eoi();
 void load_idt_register(struct IDTPtr*);
 void idt_init();
 void set_idt_gate(int n, uint32_t handler);
