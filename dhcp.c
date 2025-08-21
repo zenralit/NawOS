@@ -88,7 +88,7 @@ void dhcp_send_discover() {
 
     packet[i++] = 255; // end
 
-    // обернём в UDP+IP+ETH и пошлём
+   
     net_send_udp_packet(
         broadcast_ip,     // 255.255.255.255
         68,               // src port
