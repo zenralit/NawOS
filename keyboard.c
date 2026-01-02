@@ -6,6 +6,7 @@
 #include "math.h"
 #include <stddef.h>
 #include "ip.h"
+#include "nawlang/nawlang.h"
 
 #define INPUT_BUFFER_SIZE 256
 #define MAX_INPUT 128
@@ -48,10 +49,21 @@ void process_command(const char* input) {
         print("wr <text> - <name.ext> - Write to file\n");
         print("cat <name.ext> - Show file content\n");
         print("rm <name.ext> - Delete file\n");
-    // print("readsec <num> - Read disk sector\n");
+        print("readsec <num> - Read disk sector\n");
         print("edit <name.ext> - text editor\n");
         print("calc <math exp> - solve a mathematical expression\n");
-    } else if (strcmp(input, "clear") == 0) {
+    } else if(strcmp(input, "")==0){
+        print("\n");
+    }
+     else if (strncmp(input, "run ", 4) == 0) {
+    const char* filename = input + 4;
+    if (*filename == '\0') {
+        print("Usage: run <filename>\n");
+    } else {
+        nawlang_run(filename);
+    }
+    }
+    else if (strcmp(input, "clear") == 0) {
         clear_screen();
     } else if (strcmp(input, "reboot") == 0) {
         reboot();
@@ -255,11 +267,11 @@ void process_command(const char* input) {
         }
         else if (strcmp(input, "ifconfig") == 0) {
         print("IP Address: ");
-        for (int i = 0; i < 4; i++) {
-            print_dec(naw_ip_address[i]);
-            
-            if (i < 3) print(".");
-        }
+        //for (int i = 0; i < 4; i++) {
+            //print_dec(naw_ip_address[i]);
+                      
+          //  if (i < 3) print(".");
+        //}
         print_ip();
         print("\n");
     } else {
@@ -400,7 +412,6 @@ int strncmp(const char* s1, const char* s2, size_t n) {
   return 0;
 }
 
-
 void start_text_editor(const char* name, const char* ext) {
     clear_screen();
     print("Editing: ");
@@ -413,9 +424,9 @@ void start_text_editor(const char* name, const char* ext) {
     int loaded = fs_read_to_buffer(name, ext, buffer, sizeof(buffer));
     if (loaded >= 0) {
         print("file content:\n");
-        for (int i = 0; buffer[i] != '\0' && i < 511; i++) {
+        for (int i = 0; buffer[i] != '\0' && i < sizeof(buffer); i++) {
             put_char(buffer[i]);
-            //pos++;
+            pos++;
         }
     } else {
         print("New file\n");
@@ -427,7 +438,7 @@ void start_text_editor(const char* name, const char* ext) {
     int shift_pressed = 0;
 
     while (1) {
- uint16_t full_sc = get_scancode();
+    uint16_t full_sc = get_scancode();
     if (full_sc == 0) continue;
 
     uint8_t sc = full_sc & 0xFF;
@@ -435,13 +446,13 @@ void start_text_editor(const char* name, const char* ext) {
 
     if (full_sc == 0xE04B) { // ←
         if (pos > 0) {
-            pos--;
+            --pos;
             set_cursor_offset(pos);
         }
         continue;
     } else if (full_sc == 0xE04D) { // →
         if (buffer[pos] != '\0' && pos < 511) {
-            pos++;
+            ++pos;
             set_cursor_offset(pos);
         }
         continue;

@@ -5,7 +5,7 @@ LD   = ld
 CFLAGS  = -m32 -ffreestanding -O2 -Wall
 LDFLAGS = -m elf_i386
 
-OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o math.o pci.o rtl8139.o net.o dhcp.o ip.o irq11.o
+OBJS = kernel_entry.o idt.o irq1.o screen.o keyboard.o ports.o kernel.o idt_load.o nawfs.o disk.o math.o pci.o rtl8139.o net.o dhcp.o ip.o irq11.o nawlang.o
 
 all: os-image.bin
 
@@ -62,6 +62,9 @@ ports.o: ports.c ports.h
 
 kernel.o: kernel.c
 	$(CC) $(CFLAGS) -c kernel.c -o $@
+
+nawlang.o: nawlang/nawlang.c nawlang/nawlang.h
+	$(CC) $(CFLAGS) -c $< -o $@
 
 idt_load.o: idt_load.asm
 	$(AS) -f elf32 $< -o $@

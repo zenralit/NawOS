@@ -21,29 +21,29 @@ int main() {
         return 1;
     }
 
-    // Записываем пустой образ
+   
     uint8_t zero[SECTOR_SIZE] = {0};
     for (int i = 0; i < IMG_SIZE_SECTORS; i++)
         fwrite(zero, 1, SECTOR_SIZE, img);
 
-    // Перейдём к сектору 1 (каталог)
+   
     fseek(img, SECTOR_SIZE, SEEK_SET);
 
     nawfs_entry entry;
     memset(&entry, 0, sizeof(entry));
     strncpy(entry.name, "hello.txt", 11);
     entry.size = 15;
-    entry.start_lba = 2; // данные начнутся с 2-го сектора
+    entry.start_lba = 2; 
 
     fwrite(&entry, sizeof(entry), 1, img);
 
-    // Пишем содержимое файла
+  
     fseek(img, SECTOR_SIZE * entry.start_lba, SEEK_SET);
-    const char *content = "Hello, pidoras\n";
+    const char *content = "Hello\n";
     fwrite(content, 1, entry.size, img);
 
     fclose(img);
-    printf("Created nawfs.img with 1 file: hello.txt\n");
+    printf("Created nawfs.img with file: hello.txt\n");
     return 0;
 }
 

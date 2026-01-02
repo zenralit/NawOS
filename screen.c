@@ -40,7 +40,6 @@ void move_cursor_right() {
     if (offset < 80 * 25 - 1) set_cursor_offset(offset + 1);
 }
 
-
 void clear_screen() {
      for (int i = 0; i < 80 * 25; i++) {
         VIDEO_MEMORY[i] = (WHITE_ON_BLACK << 8) | ' ';
@@ -87,16 +86,6 @@ void update_cursor() {
 }
 
 uint8_t get_scancode() {
-    // uint8_t scancode;
-    // do {
-    //     asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
-    // } while (scancode >= 128);  
-    // return scancode;
-
-    // uint8_t scancode;
-    // asm volatile ("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
-    // return scancode;
-
     uint8_t sc = inb(0x60);
     if (sc == 0xE0) {
         uint8_t next = inb(0x60);

@@ -50,35 +50,33 @@ void dhcp_send_discover() {
     uint8_t packet[548];
     memset(packet, 0, sizeof(packet));
 
-    // Ethernet (MAC + IP) = handled by rtl8139_send_packet
-    // BOOTP + DHCP
-    packet[0] = 0x01; // BOOTREQUEST
-    packet[1] = 0x01; // Ethernet
-    packet[2] = 0x06; // MAC len
-    packet[3] = 0x00; // hops
+    packet[0] = 0x01; 
+    packet[1] = 0x01; 
+    packet[2] = 0x06;
+    packet[3] = 0x00; 
     packet[4] = 0x00; packet[5] = 0x00; packet[6] = 0x00; packet[7] = transaction_id; // xid
     packet[8] = packet[9] = packet[10] = packet[11] = 0x00; // seconds + flags
-    packet[12] = packet[13] = packet[14] = packet[15] = 0x00; // ciaddr
-    packet[16] = packet[17] = packet[18] = packet[19] = 0x00; // yiaddr
-    packet[20] = packet[21] = packet[22] = packet[23] = 0x00; // siaddr
-    packet[24] = packet[25] = packet[26] = packet[27] = 0x00; // giaddr
+    packet[20] = packet[21] = packet[22] = packet[23] = 0x00; 
+    packet[12] = packet[13] = packet[14] = packet[15] = 0x00; 
+    packet[16] = packet[17] = packet[18] = packet[19] = 0x00; 
+    packet[24] = packet[25] = packet[26] = packet[27] = 0x00; 
 
-    // chaddr (client hardware address)
+
     for (int i = 0; i < 6; i++) {
         packet[28 + i] = naw_mac_address[i];
     }
 
-    // magic cookie
+    
     packet[236] = 0x63;
     packet[237] = 0x82;
     packet[238] = 0x53;
     packet[239] = 0x63;
 
-    // DHCP options
+   
     int i = 240;
-    packet[i++] = 53; // DHCP Message Type
+    packet[i++] = 53; 
     packet[i++] = 1;
-    packet[i++] = 1;  // DHCPDISCOVER
+    packet[i++] = 1;  
 
     packet[i++] = 55; // Parameter Request List
     packet[i++] = 3;
@@ -86,13 +84,13 @@ void dhcp_send_discover() {
     packet[i++] = 3;  // router
     packet[i++] = 6;  // DNS
 
-    packet[i++] = 255; // end
+    packet[i++] = 255; 
 
    
     net_send_udp_packet(
-        broadcast_ip,     // 255.255.255.255
-        68,               // src port
-        67,               // dst port
+        broadcast_ip,    
+        68,               
+        67,              
         packet,
         i
     );

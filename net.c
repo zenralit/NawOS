@@ -78,5 +78,5 @@ void send_dhcp_discover() {
     opt[7] = 255;
 
     rtl8139_send_packet(dhcp_discover_packet, 14 + 20 + 8 + 240);
-    print("Sent DHCPDISCOVER\n");
+    // print("Sent DHCPDISCOVER\n");
 }

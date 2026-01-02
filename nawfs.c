@@ -10,7 +10,7 @@
 nawfs_entry entries[MAX_FILES];
 char file_data[SECTOR_SIZE * (MAX_FILES + 1)];
 int file_count = 0;
- uint8_t fs_buffer[SECTOR_SIZE];
+uint8_t fs_buffer[SECTOR_SIZE];
 int memcmp(const void* s1, const void* s2, size_t n);
 
 void fs_init() {
@@ -143,13 +143,13 @@ int fs_delete(const char* name, const char* ext) {
     return 0;
 }
 
-void fs_list() {
+void fs_list() { /* TODO починить наконец то вывод*/
        for (int i = 0; i < file_count; i++) {
         print(" - ");
         print(entries[i].name);
         print(".");
         print(entries[i].ext);
-        print(" (");
+        print("(");
         char size[8];
         itoa(entries[i].size, size);
         print(size);
@@ -158,7 +158,7 @@ void fs_list() {
     
 }
 
-// --- Вспомогательные функции ---
+//  функции 
 
 
 
@@ -200,6 +200,7 @@ void itoa(int value, char* str) {
     while (i > 0) *p++ = buf[--i];
         *p = 0;
 }
+
 int memcmp(const void* s1, const void* s2, size_t n) {
     const unsigned char* p1 = s1;
     const unsigned char* p2 = s2;

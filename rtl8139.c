@@ -111,9 +111,9 @@ void rtl8139_init() {
 
     io_base = pci_get_bar(dev.bus, dev.slot, dev.func, 0) & ~0x3;
 
-    print("I/O base: ");
-    print_hex(io_base);
-    print("\n");
+    // print("I/O base: ");
+    // print_hex(io_base);
+    // print("\n");
 
     outb(io_base + RTL_COMMAND_REG, 0x10);
     for (int i = 0; i < 10000; i++);
@@ -134,7 +134,7 @@ void rtl8139_init() {
     outl(io_base + RTL_RX_CONFIG, 0xf | (1 << 7) | (1 << 3));
     outw(io_base + RTL_IMR, 0x0005);
 
-    print("RTL8139 initialized and ready.\n");
+    // print("RTL8139 initialized and ready.\n");
 }
 
 void rtl8139_poll() {
