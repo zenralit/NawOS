@@ -1,8 +1,8 @@
 #include "nawlang.h"
-#include "../nawfs.h"
-#include "../screen.h"
-#include "../nawstring.h"
-#include "../math.h"
+#include "fs/nawfs.h"
+#include "drivers/screen/screen.h"
+#include "lib/nawstring.h"
+#include "lib/math.h"
 
 
 int strcmp(const char* s1, const char* s2);
