@@ -15,7 +15,7 @@
     <p>If you are on <strong>Windows</strong>, it is highly recommended to use <strong>WSL (Windows Subsystem for Linux)</strong> or <strong>MSYS2</strong>.</p>
   </blockquote>
 
-  <h2>🛠 Installation</h2>
+  <h2>Installation</h2>
   <h3>Ubuntu / Debian</h3>
   <pre><code>sudo apt update
 sudo apt install build-essential nasm qemu-system make</code></pre>
