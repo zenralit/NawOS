@@ -74,3 +74,11 @@ void itoa(int value, char* str) {
         p2--;
     }
 }
+
+int naw_strncmp(const char* a, const char* b, int n) {
+    for (int i = 0; i < n; i++) {
+        if (a[i] != b[i] || !a[i] || !b[i])
+            return a[i] - b[i];
+    }
+    return 0;
+}

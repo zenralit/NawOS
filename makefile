@@ -26,8 +26,9 @@ drivers/net/ip.o \
 drivers/net/dhcp.o \
 fs/nawfs.o \
 lib/math.o \
-nawlang/nawlang.o
-
+nawlang/parser.o \
+nawlang/vm.o \
+nawlang/compiler.o 
 
 
 all: os-image.bin
@@ -46,12 +47,8 @@ kernel/idt_load.o: kernel/idt_load.asm
 boot/bootloader.bin: boot/bootloader.asm
 	$(AS) -f bin $< -o $@
 
-
-
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
-
-
 
 kernel.bin: $(OBJS) boot/linker.ld
 	$(LD) $(LDFLAGS) -T boot/linker.ld -o $@ $(OBJS)

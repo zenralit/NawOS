@@ -7,5 +7,5 @@ int strcmp(const char* s1, const char* s2);
 unsigned int strlen(const char* str);
 char* strstr(const char* haystack, const char* needle);
 void itoa(int value, char* str);
-
+int naw_strncmp(const char* a, const char* b, int n);
 #endif

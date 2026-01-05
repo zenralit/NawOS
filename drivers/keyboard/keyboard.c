@@ -6,7 +6,7 @@
 #include "lib/math.h"
 #include <stddef.h>
 #include "drivers/net/ip.h"
-#include "nawlang/nawlang.h"
+#include "nawlang/parser.h"
 
 #define INPUT_BUFFER_SIZE 256
 #define MAX_INPUT 128
