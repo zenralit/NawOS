@@ -1,4 +1,5 @@
 03.07.25 added firs ver text editor
 04.07.25 added shift tab
-02.01.2026 added lelya Programming language
-03.02.2026 fix Project File Structure
+02.01.26 added lelya Programming language
+03.02.26 fix Project File Structure
+10.01.26 remade lelya`s logic and added interpreter
