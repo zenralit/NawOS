@@ -5,8 +5,6 @@ LD = ld
 CFLAGS  = -m32 -ffreestanding -O2 -Wall -I.
 LDFLAGS = -m elf_i386
 
-
-
 OBJS = \
 boot/kernel_entry.o \
 kernel/irq/irq0.o \
@@ -30,10 +28,7 @@ nawlang/parser.o \
 nawlang/vm.o \
 nawlang/compiler.o 
 
-
 all: os-image.bin
-
-
 
 boot/%.o: boot/%.asm
 	$(AS) -f elf32 $< -o $@
@@ -56,7 +51,6 @@ kernel.bin: $(OBJS) boot/linker.ld
 os-image.bin: boot/bootloader.bin kernel.bin
 	cat boot/bootloader.bin kernel.bin > $@
 
-
 run: os-image.bin
 	qemu-system-i386 \
 	-drive file=os-image.bin,format=raw,index=0,if=floppy \
@@ -71,4 +65,3 @@ clean:
 	drivers/*/*.o drivers/*/*/*.o \
 	fs/*.o lib/*.o nawlang/*.o \
 	*.bin
-

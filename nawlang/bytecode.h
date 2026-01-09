@@ -1,9 +1,12 @@
 #ifndef NAW_BYTECODE_H
 #define NAW_BYTECODE_H
 
-typedef enum {
-    OP_HALT = 0,
 
+#define MAX_CODE 1024
+#define MAX_VARS 64
+
+
+typedef enum {
     OP_PUSH_INT,
     OP_LOAD_VAR,
     OP_STORE_VAR,
@@ -13,10 +16,18 @@ typedef enum {
     OP_MUL,
     OP_DIV,
 
-    OP_PRINT,
+    OP_EQ,
+    OP_NE,
+    OP_LT,
+    OP_GT,
+    OP_LE,
+    OP_GE,
 
     OP_JMP,
-    OP_JMP_IF_FALSE
+    OP_JMP_IF_FALSE,
+
+    OP_PRINT,
+    OP_HALT
 } OpCode;
 
 typedef struct {
@@ -24,7 +35,5 @@ typedef struct {
     int arg;
 } Instruction;
 
-#define MAX_CODE 1024
-#define MAX_VARS 64
 
 #endif

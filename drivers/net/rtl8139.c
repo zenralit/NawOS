@@ -122,12 +122,12 @@ void rtl8139_init() {
         rtl_mac[i] = inb(io_base + RTL_MAC_REG + i);
     }
 
-    print("MAC: ");
-    for (int i = 0; i < 6; i++) {
-        print_hex(rtl_mac[i]);
-        if (i < 5) print(":");
-    }
-    print("\n");
+    // print("MAC: ");
+    // for (int i = 0; i < 6; i++) {
+    //     print_hex(rtl_mac[i]);
+    //     if (i < 5) print(":");
+    // }
+    // print("\n");
 
     outl(io_base + RTL_RX_BUF, (uint32_t)&rx_buffer[0]);
     outb(io_base + RTL_CMD_REG, RTL_CMD_RX_ENABLE | RTL_CMD_TX_ENABLE);

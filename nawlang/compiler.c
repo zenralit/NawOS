@@ -5,123 +5,428 @@
 #include "lib/nawstring.h"
 #include "lib/math.h"
 
-#define MAX_IF_STACK 16
+static const char* p;
 
-//utils
+// Объявления функций
+static int emit(Instruction* c, int* ip, OpCode op, int arg);
+static int var_index(const char* name);
+static void parse_compare(Instruction* code, int* ip);
+static void parse_expr(Instruction* code, int* ip);
+static const char* compile_if(const char* src, Instruction* code, int* ip);
+static const char* compile_statement(const char* src, Instruction* code, int* ip);
+static const char* compile_block(const char* src, Instruction* code, int* ip);
 
-static int emit(Instruction* code, int* ip, OpCode op, int arg) {
-    code[*ip].op  = op;
-    code[*ip].arg = arg;
+// Определение compile_block
+static const char* compile_block(const char* src, Instruction* code, int* ip) {
+    while (*src == ' ') src++;
+
+    if (*src != '{') return src;
+    src++;
+
+    while (*src && *src != '}') {
+        src = compile_statement(src, code, ip);
+        while (*src == '\n' || *src == ' ') src++;
+    }
+
+    if (*src == '}') src++;
+    return src;
+}
+
+// Определение compile_statement
+static const char* compile_statement(const char* src, Instruction* code, int* ip) {
+    while (*src == ' ' || *src == '\n') src++;
+
+    // if
+    if (src[0] == 'i' && src[1] == 'f')
+        return compile_if(src, code, ip);
+
+    // print
+    if (src[0] == 'p' && src[1] == 'r') {
+        src += 5; // print
+        parse_expr(code, ip);
+        emit(code, ip, OP_PRINT, 0);
+        while (*src && *src != '\n') src++;
+        return src;
+    }
+
+    // assignment
+    if ((*src >= 'a' && *src <= 'z') ||
+        (*src >= 'A' && *src <= 'Z')) {
+
+        char name[16];
+        int k = 0;
+
+        while ((*src >= 'a' && *src <= 'z') ||
+               (*src >= 'A' && *src <= 'Z'))
+            name[k++] = *src++;
+
+        name[k] = 0;
+
+        while (*src == ' ') src++;
+        if (*src == '=') src++;
+
+        parse_expr(code, ip);
+        emit(code, ip, OP_STORE_VAR, var_index(name));
+
+        while (*src && *src != '\n') src++;
+        return src;
+    }
+
+    return src + 1;
+}
+
+// Определение parse_factor
+static void parse_factor(Instruction* code, int* ip) {
+    while (*p == ' ') p++;
+
+    if (*p == '(') {
+        p++;
+        parse_expr(code, ip);
+        if (*p == ')') p++;
+        return;
+    }
+
+    // number
+    if (*p >= '0' && *p <= '9') {
+        int v = 0;
+        while (*p >= '0' && *p <= '9')
+            v = v * 10 + (*p++ - '0');
+        emit(code, ip, OP_PUSH_INT, v);
+        return;
+    }
+
+    // variable
+    char name[16];
+    int k = 0;
+    while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z')) {
+        name[k++] = *p++;
+    }
+    name[k] = 0;
+
+    emit(code, ip, OP_LOAD_VAR, var_index(name));
+}
+
+// Определение parse_term
+static void parse_term(Instruction* code, int* ip) {
+    parse_factor(code, ip);
+
+    for (;;) {
+        while (*p == ' ') p++;
+        if (*p == '*' || *p == '/') {
+            char op = *p++;
+            parse_factor(code, ip);
+            emit(code, ip, op == '*' ? OP_MUL : OP_DIV, 0);
+        } else break;
+    }
+}
+
+// Определение parse_expr
+static void parse_expr(Instruction* code, int* ip) {
+    parse_term(code, ip);
+
+    for (;;) {
+        while (*p == ' ') p++;
+        if (*p == '+' || *p == '-') {
+            char op = *p++;
+            parse_term(code, ip);
+            emit(code, ip, op == '+' ? OP_ADD : OP_SUB, 0);
+        } else break;
+    }
+}
+
+// Определение compile_expr
+void compile_expr(const char* expr, Instruction* code, int* ip) {
+    p = expr;
+    parse_compare(code, ip);
+}
+
+// Определение emit
+static int emit(Instruction* c, int* ip, OpCode op, int arg) {
+    c[*ip].op = op;
+    c[*ip].arg = arg;
     return (*ip)++;
 }
 
-int naw_strncmp(const char* a, const char* b, int n) {
-    for (int i = 0; i < n; i++) {
-        if (a[i] != b[i] || !a[i] || !b[i])
-            return a[i] - b[i];
-    }
-    return 0;
-}
-
-
-// variables
-
+// Определение var_index
 static int var_index(const char* name) {
-    static char vars[MAX_VARS][16];
+    static char vars[64][16];
     static int count = 0;
 
     for (int i = 0; i < count; i++) {
-        if (!strcmp(vars[i], name))
+        int j = 0;
+        while (vars[i][j] && name[j] && vars[i][j] == name[j])
+            j++;
+
+        if (vars[i][j] == 0 && name[j] == 0)
             return i;
     }
 
-    strncpy(vars[count], name, 15);
-    vars[count][15] = 0;
+    int j = 0;
+    while (name[j] && j < 15) {
+        vars[count][j] = name[j];
+        j++;
+    }
+    vars[count][j] = 0;
+
     return count++;
 }
 
-//compiler
-
-int naw_compile(const char* src, Instruction* code) {
+// Определение naw_compile
+int naw_compile(const char* src, Instruction* out) {
     int ip = 0;
-    char line[128];
-    int pos = 0;
+    const char* line = src;
 
-    int if_stack[MAX_IF_STACK];
-    int if_sp = 0;
+    while (*line) {
+        while (*line == ' ' || *line == '\n') line++;
 
-    for (int i = 0;; i++) {
-        char c = src[i];
+        //IF / ELSE 
+        if (line[0] == 'i' && line[1] == 'f') {
+            line += 2;
 
-        if (c == '\n' || c == 0) {
-            line[pos] = 0;
-            pos = 0;
+            while (*line == ' ') line++;
 
-            //int x = expr 
-            if (!naw_strncmp(line, "int ", 4)) {
-                char name[16] = {0};
-                char* p = line + 4;
-                int k = 0;
-
-                while (*p && *p != '=' && *p != ' ')
-                    name[k++] = *p++;
-
-                while (*p && *p != '=') p++;
-                if (*p == '=') p++;
-
-                int v = eval_expr(p);
-                emit(code, &ip, OP_PUSH_INT, v);
-                emit(code, &ip, OP_STORE_VAR, var_index(name));
+            // '('
+            if (*line != '(') {
+                return ip;
             }
+            line++;
 
-            //print expr 
-            else if (!naw_strncmp(line, "print ", 6)) {
-                int v = eval_expr(line + 6);
-                emit(code, &ip, OP_PUSH_INT, v);
-                emit(code, &ip, OP_PRINT, 0);
-            }
+            // compile condition
+            compile_expr(line, out, &ip);
 
-            //if (cond)
-            else if (!naw_strncmp(line, "if", 2)) {
-                char* p = find_char(line, '(');
-                char* q = find_char(line, ')');
+            while (*line && *line != ')') line++;
+            if (*line == ')') line++;
 
-                if (p && q && q > p) {
-                    char cond[64];
-                    int len = q - p - 1;
-                    if (len > 63) len = 63;
+            // JMP_IF_FALSE (
+            int jmp_false = ip;
+            emit(out, &ip, OP_JMP_IF_FALSE, 0);
 
-                    strncpy(cond, p + 1, len);
-                    cond[len] = 0;
+            // skip spaces
+            while (*line == ' ') line++;
 
-                    int v = eval_expr(cond);
-                    emit(code, &ip, OP_PUSH_INT, v);
+            // '{'
+            if (*line != '{') return ip;
+            line++;
 
-                    if_stack[if_sp++] =
-                        emit(code, &ip, OP_JMP_IF_FALSE, 0);
+            // THEN block
+            while (*line && *line != '}') {
+                const char* inner = line;
+                line = inner;
+                
+                while (*line == ' ' || *line == '\n') line++;
+
+                if (strncmp(line, "print", 5) == 0) {
+                    line += 5;
+                    compile_expr(line, out, &ip);
+                    emit(out, &ip, OP_PRINT, 0);
                 }
+                else if ((*line >= 'a' && *line <= 'z') ||
+                         (*line >= 'A' && *line <= 'Z')) {
+
+                    char name[16];
+                    int k = 0;
+
+                    while ((*line >= 'a' && *line <= 'z') ||
+                           (*line >= 'A' && *line <= 'Z')) {
+                        name[k++] = *line++;
+                    }
+                    name[k] = 0;
+
+                    while (*line == ' ') line++;
+                    if (*line == '=') line++;
+
+                    compile_expr(line, out, &ip);
+                    emit(out, &ip, OP_STORE_VAR, var_index(name));
+                }
+
+                while (*line && *line != '\n') line++;
+                if (*line == '\n') line++;
             }
 
-            //else
-            else if (!naw_strncmp(line, "else", 4)) {
-                int j = emit(code, &ip, OP_JMP, 0);
-                code[if_stack[if_sp - 1]].arg = ip;
-                if_stack[if_sp - 1] = j;
+            // закрывающая '}'
+            if (*line == '}') line++;
+
+            // skip spaces
+            while (*line == ' ') line++;
+
+            // ELSE?
+            if (line[0] == 'e' && line[1] == 'l' &&
+                line[2] == 's' && line[3] == 'e') {
+
+                // JMP через else
+                int jmp_end = ip;
+                emit(out, &ip, OP_JMP, 0);
+
+                // JMP_IF_FALSE начало else
+                out[jmp_false].arg = ip;
+
+                line += 4;
+                while (*line == ' ') line++;
+
+                if (*line != '{') return ip;
+                line++;
+
+                // ELSE bock
+                while (*line && *line != '}') {
+                    while (*line == ' ' || *line == '\n') line++;
+
+                    if (strncmp(line, "print", 5) == 0) {
+                        line += 5;
+                        compile_expr(line, out, &ip);
+                        emit(out, &ip, OP_PRINT, 0);
+                    }
+                    else if ((*line >= 'a' && *line <= 'z') ||
+                             (*line >= 'A' && *line <= 'Z')) {
+
+                        char name[16];
+                        int k = 0;
+
+                        while ((*line >= 'a' && *line <= 'z') ||
+                               (*line >= 'A' && *line <= 'Z')) {
+                            name[k++] = *line++;
+                        }
+                        name[k] = 0;
+
+                        while (*line == ' ') line++;
+                        if (*line == '=') line++;
+
+                        compile_expr(line, out, &ip);
+                        emit(out, &ip, OP_STORE_VAR, var_index(name));
+                    }
+
+                    while (*line && *line != '\n') line++;
+                    if (*line == '\n') line++;
+                }
+
+                if (*line == '}') line++;
+
+                //JMP  конец
+                out[jmp_end].arg = ip;
+            } else {
+                // без else
+                out[jmp_false].arg = ip;
             }
 
-            //}
-            else if (!naw_strncmp(line, "}", 1)) {
-                code[if_stack[--if_sp]].arg = ip;
-            }
-
-            if (c == 0)
-                break;
-        } else {
-            if (pos < 127)
-                line[pos++] = c;
+            continue;
         }
+
+        //PRINT 
+        if (strncmp(line, "print", 5) == 0) {
+            line += 5;
+            compile_expr(line, out, &ip);
+            emit(out, &ip, OP_PRINT, 0);
+        }
+
+        // ASSIGN 
+        else if ((*line >= 'a' && *line <= 'z') ||
+                 (*line >= 'A' && *line <= 'Z')) {
+
+            char name[16];
+            int k = 0;
+
+            while ((*line >= 'a' && *line <= 'z') ||
+                   (*line >= 'A' && *line <= 'Z')) {
+                name[k++] = *line++;
+            }
+            name[k] = 0;
+
+            while (*line == ' ') line++;
+            if (*line == '=') line++;
+
+            compile_expr(line, out, &ip);
+            emit(out, &ip, OP_STORE_VAR, var_index(name));
+        }
+
+        // следующая строка
+        while (*line && *line != '\n') line++;
     }
 
-    emit(code, &ip, OP_HALT, 0);
+    emit(out, &ip, OP_HALT, 0);
     return ip;
+}
+
+// Определение parse_compare
+static void parse_compare(Instruction* code, int* ip) {
+    parse_expr(code, ip);
+
+    for (;;) {
+        while (*p == ' ') p++;
+
+        if (*p == '=' && *(p+1) == '=') {
+            p += 2;
+            parse_expr(code, ip);
+            emit(code, ip, OP_EQ, 0);
+        }
+        else if (*p == '!' && *(p+1) == '=') {
+            p += 2;
+            parse_expr(code, ip);
+            emit(code, ip, OP_NE, 0);
+        }
+        else if (*p == '<' && *(p+1) == '=') {
+            p += 2;
+            parse_expr(code, ip);
+            emit(code, ip, OP_LE, 0);
+        }
+        else if (*p == '>' && *(p+1) == '=') {
+            p += 2;
+            parse_expr(code, ip);
+            emit(code, ip, OP_GE, 0);
+        }
+        else if (*p == '<') {
+            p++;
+            parse_expr(code, ip);
+            emit(code, ip, OP_LT, 0);
+        }
+        else if (*p == '>') {
+            p++;
+            parse_expr(code, ip);
+            emit(code, ip, OP_GT, 0);
+        }
+        else break;
+    }
+}
+
+// Определение compile_if
+static const char* compile_if(const char* src, Instruction* code, int* ip) {
+    src += 2; // skip "if"
+
+    while (*src == ' ') src++;
+    if (*src != '(') return src;
+    src++;
+
+    // условие
+    compile_expr(src, code, ip);
+
+    while (*src && *src != ')') src++;
+    if (*src == ')') src++;
+
+    int jmp_false = *ip;
+    emit(code, ip, OP_JMP_IF_FALSE, 0);
+
+    // then block
+    src = compile_block(src, code, ip);
+
+    // else?
+    while (*src == ' ') src++;
+
+    if (src[0] == 'e' && src[1] == 'l' &&
+        src[2] == 's' && src[3] == 'e') {
+
+        int jmp_end = *ip;
+        emit(code, ip, OP_JMP, 0);
+
+        // патчим JMP_IF_FALSE → else
+        code[jmp_false].arg = *ip;
+
+        src += 4;
+        src = compile_block(src, code, ip);
+
+        // патчим JMP → конец
+        code[jmp_end].arg = *ip;
+    } else {
+        // без else
+        code[jmp_false].arg = *ip;
+    }
+
+    return src;
 }

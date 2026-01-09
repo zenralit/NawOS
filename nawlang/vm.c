@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "drivers/screen/screen.h"
 
+
 static int stack[256];
 static int sp = 0;
 
@@ -49,6 +50,42 @@ void vm_run(Instruction* code) {
                 if (!pop()) ip = in.arg;
                 break;
 
+            case OP_EQ: {
+                int b = pop();
+                int a = pop();
+                push(a == b);
+                break;
+            }
+            case OP_NE: {
+                int b = pop();
+                int a = pop();
+                push(a != b);
+                break;
+            }
+            case OP_LT: {
+                int b = pop();
+                int a = pop();
+                push(a < b);
+                break;
+            }
+            case OP_GT: {
+                int b = pop();
+                int a = pop();
+                push(a > b);
+                break;
+            }
+            case OP_LE: {
+                int b = pop();
+                int a = pop();
+                push(a <= b);
+                break;
+            }
+            case OP_GE: {
+                int b = pop();
+                int a = pop();
+                push(a >= b);
+                break;
+            }
             default:
                 print("VM: bad opcode\n");
                 return;

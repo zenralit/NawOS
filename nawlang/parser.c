@@ -1,7 +1,7 @@
 #include "parser.h"
 #include "compiler.h"
 #include "vm.h"
-
+#include "bytecode.h"
 #include "fs/nawfs.h"
 #include "drivers/screen/screen.h"
 #include "drivers/keyboard/keyboard.h"
