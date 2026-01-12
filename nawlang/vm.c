@@ -28,28 +28,43 @@ void vm_run(Instruction* code) {
                 push(vars[in.arg]);
                 break;
 
-            case OP_STORE_VAR:
-                vars[in.arg] = pop();
+            case OP_STORE_VAR: {
+                int v = pop();
+                vars[in.arg] = v;
                 break;
+            }
 
             case OP_ADD: push(pop() + pop()); break;
             case OP_SUB: { int b=pop(), a=pop(); push(a-b); } break;
             case OP_MUL: push(pop() * pop()); break;
             case OP_DIV: { int b=pop(), a=pop(); push(a/b); } break;
 
-            case OP_PRINT:
+            case OP_PRINT_INT:
                 print_dec(pop());
                 print("\n");
                 break;
 
+            case OP_PRINT_STR:
+                print((char*)pop());
+                print("\n");
+                break;
+
+            case OP_PUSH_STR:
+                push(in.arg);
+                break;
+
             case OP_JMP:
                 ip = in.arg;
-                break;
+                continue; 
 
-            case OP_JMP_IF_FALSE:
-                if (!pop()) ip = in.arg;
+            case OP_JMP_IF_FALSE: {
+                int cond = pop();
+                if (cond == 0) {
+                    ip = in.arg;
+                    continue;
+                }
                 break;
-
+            }
             case OP_EQ: {
                 int b = pop();
                 int a = pop();
@@ -90,5 +105,5 @@ void vm_run(Instruction* code) {
                 print("VM: bad opcode\n");
                 return;
         }
-    }
+    }ip++;
 }

@@ -23,6 +23,7 @@ void nawlang_run(const char* filename) {
     strncpy(ext, dot + 1, 3);
 
     const char* src = fs_read(name, ext);
+    
     if (!src) {
         print("File not found\n");
         return;

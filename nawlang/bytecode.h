@@ -1,13 +1,14 @@
 #ifndef NAW_BYTECODE_H
 #define NAW_BYTECODE_H
 
-
 #define MAX_CODE 1024
 #define MAX_VARS 64
 
-
 typedef enum {
     OP_PUSH_INT,
+    OP_PUSH_STR,
+    OP_PRINT_INT,
+    OP_PRINT_STR,
     OP_LOAD_VAR,
     OP_STORE_VAR,
 

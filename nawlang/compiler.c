@@ -4,19 +4,46 @@
 #include "drivers/keyboard/keyboard.h"
 #include "lib/nawstring.h"
 #include "lib/math.h"
+#define MAX_STRINGS 64
+#define MAX_STRING_LEN 64
 
+static char string_pool[MAX_STRINGS][MAX_STRING_LEN];
+static int string_count = 0;
 static const char* p;
 
-// Объявления функций
 static int emit(Instruction* c, int* ip, OpCode op, int arg);
 static int var_index(const char* name);
+static void parse_factor(Instruction* code, int* ip);
 static void parse_compare(Instruction* code, int* ip);
 static void parse_expr(Instruction* code, int* ip);
+void compile_expr(const char* expr, Instruction* code, int* ip);
 static const char* compile_if(const char* src, Instruction* code, int* ip);
 static const char* compile_statement(const char* src, Instruction* code, int* ip);
 static const char* compile_block(const char* src, Instruction* code, int* ip);
+static const char* compile_while(const char* src, Instruction* code, int* ip);
 
-// Определение compile_block
+
+static char* add_string(const char* s) {
+    int i = 0;
+
+    for (i = 0; i < string_count; i++) {
+        int j = 0;
+        while (string_pool[i][j] == s[j] && s[j]) j++;
+        if (string_pool[i][j] == 0 && s[j] == 0)
+            return string_pool[i];
+    }
+
+    i = 0;
+    while (s[i] && i < MAX_STRING_LEN - 1) {
+        string_pool[string_count][i] = s[i];
+        i++;
+    }
+    string_pool[string_count][i] = 0;
+
+    return string_pool[string_count++];
+}
+
+
 static const char* compile_block(const char* src, Instruction* code, int* ip) {
     while (*src == ' ') src++;
 
@@ -32,7 +59,7 @@ static const char* compile_block(const char* src, Instruction* code, int* ip) {
     return src;
 }
 
-// Определение compile_statement
+
 static const char* compile_statement(const char* src, Instruction* code, int* ip) {
     while (*src == ' ' || *src == '\n') src++;
 
@@ -40,11 +67,24 @@ static const char* compile_statement(const char* src, Instruction* code, int* ip
     if (src[0] == 'i' && src[1] == 'f')
         return compile_if(src, code, ip);
 
-    // print
+
     if (src[0] == 'p' && src[1] == 'r') {
         src += 5; // print
-        parse_expr(code, ip);
-        emit(code, ip, OP_PRINT, 0);
+        while (*src == ' ') src++;
+
+
+        if (*src == '"') {
+            p = src;
+            parse_factor(code, ip); 
+            emit(code, ip, OP_PRINT_STR, 0);
+            src = p;
+        }
+
+        else {
+            compile_expr(src, code, ip);
+            emit(code, ip, OP_PRINT_INT, 0);
+        }
+
         while (*src && *src != '\n') src++;
         return src;
     }
@@ -72,11 +112,31 @@ static const char* compile_statement(const char* src, Instruction* code, int* ip
         return src;
     }
 
+    if (src[0] == 'w' && src[1] == 'h') {
+    return compile_while(src, code, ip);
+    }
     return src + 1;
 }
 
-// Определение parse_factor
+
 static void parse_factor(Instruction* code, int* ip) {
+        if (*p == '"') {
+        p++;
+
+        char buf[64];
+        int k = 0;
+
+        while (*p && *p != '"' && k < 63)
+            buf[k++] = *p++;
+
+        buf[k] = 0;
+        if (*p == '"') p++;
+
+        char* s = add_string(buf);
+        emit(code, ip, OP_PUSH_STR, (int)s);
+        return;
+    }
+
     while (*p == ' ') p++;
 
     if (*p == '(') {
@@ -106,7 +166,6 @@ static void parse_factor(Instruction* code, int* ip) {
     emit(code, ip, OP_LOAD_VAR, var_index(name));
 }
 
-// Определение parse_term
 static void parse_term(Instruction* code, int* ip) {
     parse_factor(code, ip);
 
@@ -120,7 +179,6 @@ static void parse_term(Instruction* code, int* ip) {
     }
 }
 
-// Определение parse_expr
 static void parse_expr(Instruction* code, int* ip) {
     parse_term(code, ip);
 
@@ -134,20 +192,17 @@ static void parse_expr(Instruction* code, int* ip) {
     }
 }
 
-// Определение compile_expr
 void compile_expr(const char* expr, Instruction* code, int* ip) {
     p = expr;
     parse_compare(code, ip);
 }
 
-// Определение emit
 static int emit(Instruction* c, int* ip, OpCode op, int arg) {
     c[*ip].op = op;
     c[*ip].arg = arg;
     return (*ip)++;
 }
 
-// Определение var_index
 static int var_index(const char* name) {
     static char vars[64][16];
     static int count = 0;
@@ -171,7 +226,6 @@ static int var_index(const char* name) {
     return count++;
 }
 
-// Определение naw_compile
 int naw_compile(const char* src, Instruction* out) {
     int ip = 0;
     const char* line = src;
@@ -217,8 +271,17 @@ int naw_compile(const char* src, Instruction* out) {
 
                 if (strncmp(line, "print", 5) == 0) {
                     line += 5;
-                    compile_expr(line, out, &ip);
-                    emit(out, &ip, OP_PRINT, 0);
+                    while (*line == ' ') line++;
+
+                    if (*line == '"') {
+                        p = line;
+                        parse_factor(out, &ip);
+                        emit(out, &ip, OP_PRINT_STR, 0);
+                        line = p;
+                    } else {
+                        compile_expr(line, out, &ip);
+                        emit(out, &ip, OP_PRINT_INT, 0);
+                    }
                 }
                 else if ((*line >= 'a' && *line <= 'z') ||
                          (*line >= 'A' && *line <= 'Z')) {
@@ -243,7 +306,7 @@ int naw_compile(const char* src, Instruction* out) {
                 if (*line == '\n') line++;
             }
 
-            // закрывающая '}'
+            //  }
             if (*line == '}') line++;
 
             // skip spaces
@@ -272,8 +335,17 @@ int naw_compile(const char* src, Instruction* out) {
 
                     if (strncmp(line, "print", 5) == 0) {
                         line += 5;
-                        compile_expr(line, out, &ip);
-                        emit(out, &ip, OP_PRINT, 0);
+                        while (*line == ' ') line++;
+
+                        if (*line == '"') {
+                            p = line;
+                            parse_factor(out, &ip);      
+                            emit(out, &ip, OP_PRINT_STR, 0);
+                            line = p;
+                        } else {
+                            compile_expr(line, out, &ip);
+                            emit(out, &ip, OP_PRINT_INT, 0);
+                        }
                     }
                     else if ((*line >= 'a' && *line <= 'z') ||
                              (*line >= 'A' && *line <= 'Z')) {
@@ -310,11 +382,19 @@ int naw_compile(const char* src, Instruction* out) {
             continue;
         }
 
-        //PRINT 
         if (strncmp(line, "print", 5) == 0) {
             line += 5;
-            compile_expr(line, out, &ip);
-            emit(out, &ip, OP_PRINT, 0);
+            while (*line == ' ') line++;
+
+            if (*line == '"') {
+                p = line;
+                parse_factor(out, &ip);
+                emit(out, &ip, OP_PRINT_STR, 0);
+                line = p;
+            } else {
+                compile_expr(line, out, &ip);
+                emit(out, &ip, OP_PRINT_INT, 0);
+            }
         }
 
         // ASSIGN 
@@ -337,7 +417,7 @@ int naw_compile(const char* src, Instruction* out) {
             emit(out, &ip, OP_STORE_VAR, var_index(name));
         }
 
-        // следующая строка
+        // след строка
         while (*line && *line != '\n') line++;
     }
 
@@ -345,7 +425,7 @@ int naw_compile(const char* src, Instruction* out) {
     return ip;
 }
 
-// Определение parse_compare
+
 static void parse_compare(Instruction* code, int* ip) {
     parse_expr(code, ip);
 
@@ -386,15 +466,13 @@ static void parse_compare(Instruction* code, int* ip) {
     }
 }
 
-// Определение compile_if
 static const char* compile_if(const char* src, Instruction* code, int* ip) {
-    src += 2; // skip "if"
+    src += 2; 
 
     while (*src == ' ') src++;
     if (*src != '(') return src;
     src++;
 
-    // условие
     compile_expr(src, code, ip);
 
     while (*src && *src != ')') src++;
@@ -403,10 +481,8 @@ static const char* compile_if(const char* src, Instruction* code, int* ip) {
     int jmp_false = *ip;
     emit(code, ip, OP_JMP_IF_FALSE, 0);
 
-    // then block
     src = compile_block(src, code, ip);
 
-    // else?
     while (*src == ' ') src++;
 
     if (src[0] == 'e' && src[1] == 'l' &&
@@ -415,18 +491,40 @@ static const char* compile_if(const char* src, Instruction* code, int* ip) {
         int jmp_end = *ip;
         emit(code, ip, OP_JMP, 0);
 
-        // патчим JMP_IF_FALSE → else
         code[jmp_false].arg = *ip;
 
         src += 4;
         src = compile_block(src, code, ip);
 
-        // патчим JMP → конец
         code[jmp_end].arg = *ip;
     } else {
-        // без else
         code[jmp_false].arg = *ip;
     }
+
+    return src;
+}
+static const char* compile_while(const char* src, Instruction* code, int* ip) {
+    src += 5; 
+
+    while (*src == ' ') src++;
+    if (*src != '(') return src;
+    src++;
+
+    int loop_start = *ip;
+
+    compile_expr(src, code, ip);
+
+    while (*src && *src != ')') src++;
+    if (*src == ')') src++;
+
+    int jmp_exit = *ip;
+    emit(code, ip, OP_JMP_IF_FALSE, 0);
+
+    src = compile_block(src, code, ip);
+
+    emit(code, ip, OP_JMP, loop_start);
+
+    code[jmp_exit].arg = *ip;
 
     return src;
 }

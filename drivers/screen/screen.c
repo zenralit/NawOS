@@ -128,6 +128,12 @@ void print_int(int num) {
         put_char(buf[i]);
     }
 }
+void print_tab(){
+    
+    put_char(' ');
+
+}
+
 void print_hex(uint16_t value) {
     char hex_digits[] = "0123456789ABCDEF";
     char output[7]; 

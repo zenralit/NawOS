@@ -18,7 +18,6 @@ uint8_t key_pressed[128] = {0};
 int shift_pressed = 0;
 uint8_t key_down[256] = {0};
 
-
 // -------- keyboard map -------- //
 static const char scancode_map[128] = {
     0, 27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
@@ -281,10 +280,6 @@ void process_command(const char* input) {
     input_pos = 0;
     input_buffer[0] = 0;
 }
-// need created prog lang. first meybe name it`s "ley" like a "lua"
-// second - ait 
-// Yad 
-//nasway
 // --------- функции --------- //
 
 void handle_input(char c) {
@@ -444,17 +439,16 @@ void start_text_editor(const char* name, const char* ext) {
     uint8_t sc = full_sc & 0xFF;
    // uint8_t pref = full_sc >> 8;
 
-    if (full_sc == 0xE04B) { // ←
-        if (pos > 0) {
-            --pos;
-            set_cursor_offset(pos);
-        }
+    if(sc == 0xF){
+       print("    ");
+       
+    }
+
+    if (full_sc == 0x004B) { // ←
+       move_cursor_left();
         continue;
-    } else if (full_sc == 0xE04D) { // →
-        if (buffer[pos] != '\0' && pos < 511) {
-            ++pos;
-            set_cursor_offset(pos);
-        }
+    } else if (full_sc == 0x004D) { // →
+         move_cursor_right();
         continue;
     }
         if (sc & 0x80) {
