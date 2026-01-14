@@ -7,9 +7,20 @@
 #define MAX_STRINGS 64
 #define MAX_STRING_LEN 64
 
+typedef struct {
+    int loop_start;
+    int break_jumps[32];
+    int break_count;
+    int continue_jumps[32];
+    int continue_count;
+} LoopContext;
+
+
 static char string_pool[MAX_STRINGS][MAX_STRING_LEN];
 static int string_count = 0;
 static const char* p;
+static LoopContext loop_stack[8];
+static int loop_sp = 0;
 
 static int emit(Instruction* c, int* ip, OpCode op, int arg);
 static int var_index(const char* name);
@@ -22,6 +33,17 @@ static const char* compile_statement(const char* src, Instruction* code, int* ip
 static const char* compile_block(const char* src, Instruction* code, int* ip);
 static const char* compile_while(const char* src, Instruction* code, int* ip);
 
+// static int is_alpha(char c) {
+//     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+// }
+
+// static int func_index(const char* name) {
+//     for (int i = 0; i < func_count; i++) {
+//         if (strcmp(functions[i].name, name) == 0)
+//             return i;
+//     }
+//     return -1;
+// }
 
 static char* add_string(const char* s) {
     int i = 0;
@@ -67,6 +89,9 @@ static const char* compile_statement(const char* src, Instruction* code, int* ip
     if (src[0] == 'i' && src[1] == 'f')
         return compile_if(src, code, ip);
 
+    if (src[0]=='w' && src[1]=='h') {
+        return compile_while(src, code, ip);
+    }
 
     if (src[0] == 'p' && src[1] == 'r') {
         src += 5; // print
@@ -88,6 +113,22 @@ static const char* compile_statement(const char* src, Instruction* code, int* ip
         while (*src && *src != '\n') src++;
         return src;
     }
+   
+    if (src[0]=='b' && src[1]=='r') { 
+        LoopContext* ctx = &loop_stack[loop_sp-1];
+        ctx->break_jumps[ctx->break_count++] = *ip;
+        emit(code, ip, OP_JMP, 0);
+        while (*src && *src != '\n') src++;
+        return src;
+    }
+
+    if (src[0]=='c' && src[1]=='o') {
+        LoopContext* ctx = &loop_stack[loop_sp-1];
+        ctx->continue_jumps[ctx->continue_count++] = *ip;
+        emit(code, ip, OP_JMP, ctx->loop_start);
+        while (*src && *src != '\n') src++;
+        return src;
+    }
 
     // assignment
     if ((*src >= 'a' && *src <= 'z') ||
@@ -105,17 +146,14 @@ static const char* compile_statement(const char* src, Instruction* code, int* ip
         while (*src == ' ') src++;
         if (*src == '=') src++;
 
-        parse_expr(code, ip);
+        compile_expr(src, code, ip);
         emit(code, ip, OP_STORE_VAR, var_index(name));
 
         while (*src && *src != '\n') src++;
         return src;
     }
+    return src;
 
-    if (src[0] == 'w' && src[1] == 'h') {
-    return compile_while(src, code, ip);
-    }
-    return src + 1;
 }
 
 
@@ -154,6 +192,28 @@ static void parse_factor(Instruction* code, int* ip) {
         emit(code, ip, OP_PUSH_INT, v);
         return;
     }
+
+//     if (is_alpha(*p)) {
+//     char name[16];
+//     int k = 0;
+//     while (is_alpha(*p)) name[k++] = *p++;
+//     name[k] = 0;
+
+//     if (*p == '(') {
+//         p++;
+//         int argc = 0;
+//         while (*p && *p != ')') {
+//             parse_expr(code, ip);
+//             argc++;
+//             if (*p == ',') p++;
+//         }
+//         p++;
+
+//         int fidx = func_index(name);
+//         emit(code, ip, OP_CALL, fidx);
+//         return;
+//     }
+// }
 
     // variable
     char name[16];
@@ -382,6 +442,10 @@ int naw_compile(const char* src, Instruction* out) {
             continue;
         }
 
+            if (line[0]=='w' && line[1]=='h') {
+                line = compile_while(line, out, &ip);
+                continue;
+        }
         if (strncmp(line, "print", 5) == 0) {
             line += 5;
             while (*line == ' ') line++;
@@ -505,14 +569,18 @@ static const char* compile_if(const char* src, Instruction* code, int* ip) {
 }
 static const char* compile_while(const char* src, Instruction* code, int* ip) {
     src += 5; 
-
     while (*src == ' ') src++;
     if (*src != '(') return src;
     src++;
 
-    int loop_start = *ip;
+    LoopContext* ctx = &loop_stack[loop_sp++];
+    ctx->loop_start = *ip;
+    ctx->break_count = 0;
+    ctx->continue_count = 0;
 
-    compile_expr(src, code, ip);
+    p = src;
+    parse_compare(code, ip);
+    src = p;
 
     while (*src && *src != ')') src++;
     if (*src == ')') src++;
@@ -522,9 +590,60 @@ static const char* compile_while(const char* src, Instruction* code, int* ip) {
 
     src = compile_block(src, code, ip);
 
-    emit(code, ip, OP_JMP, loop_start);
+    emit(code, ip, OP_JMP, ctx->loop_start);
+
+    loop_sp--;
+
+    for (int i = 0; i < ctx->break_count; i++) {
+        code[ctx->break_jumps[i]].arg = *ip;
+    }
+    
+    for (int i = 0; i < ctx->continue_count; i++) {
+        code[ctx->continue_jumps[i]].arg = ctx->loop_start;
+    }
 
     code[jmp_exit].arg = *ip;
 
     return src;
 }
+
+// static const char* compile_function(const char* src, Instruction* code, int* ip) {
+//     src += 3;
+//     while (*src == ' ') src++;
+
+//     char name[16];
+//     int k = 0;
+//     while ((*src >= 'a' && *src <= 'z') ||
+//            (*src >= 'A' && *src <= 'Z')) {
+//         name[k++] = *src++;
+//     }
+//     name[k] = 0;
+
+//     int fidx = func_count++;
+//     strncpy(functions[fidx].name, name, 16);
+//     functions[fidx].entry_ip = *ip;
+
+//     while (*src && *src != '(') src++;
+//     src++;
+
+//     int param_count = 0;
+//     while (*src && *src != ')') {
+//         if ((*src >= 'a' && *src <= 'z') ||
+//             (*src >= 'A' && *src <= 'Z')) {
+//             param_count++;
+//             while ((*src >= 'a' && *src <= 'z') ||
+//                    (*src >= 'A' && *src <= 'Z')) src++;
+//         }
+//         if (*src == ',') src++;
+//     }
+//     src++;
+
+//     functions[fidx].param_count = param_count;
+
+//     src = compile_block(src, code, ip);
+
+//     emit(code, ip, OP_PUSH_INT, 0);
+//     emit(code, ip, OP_RET, 0);
+
+//     return src;
+// }

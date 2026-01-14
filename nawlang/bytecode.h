@@ -27,6 +27,9 @@ typedef enum {
     OP_JMP,
     OP_JMP_IF_FALSE,
 
+    // OP_CALL,     
+    // OP_RET,      
+
     OP_PRINT,
     OP_HALT
 } OpCode;

@@ -1,10 +1,18 @@
 #include "vm.h"
 #include "drivers/screen/screen.h"
 
+typedef struct {
+    int return_ip;
+    int base_sp;
+} CallFrame;
 
+
+// Function functions[MAX_FUNCS];
+// int func_count = 0;
 static int stack[256];
 static int sp = 0;
-
+// static CallFrame call_stack[MAX_CALL_STACK];
+// static int call_sp = 0;
 static int vars[MAX_VARS];
 
 static void push(int v) { stack[sp++] = v; }
@@ -101,9 +109,30 @@ void vm_run(Instruction* code) {
                 push(a >= b);
                 break;
             }
+            // case OP_CALL: {
+            //     int fidx = in.arg;
+
+            //     call_stack[call_sp++] = (CallFrame){
+            //         .return_ip = ip,
+            //         .base_sp = sp - functions[fidx].param_count
+            //     };
+
+            //     ip = functions[fidx].entry_ip;
+            //     break;
+            // }
+            // case OP_RET: {
+            //     int ret = pop();
+            //     CallFrame frame = call_stack[--call_sp];
+
+            //     sp = frame.base_sp;
+            //     push(ret);
+            //     ip = frame.return_ip;
+            //     break;
+            // }
+
             default:
                 print("VM: bad opcode\n");
                 return;
         }
-    }ip++;
+    }
 }
