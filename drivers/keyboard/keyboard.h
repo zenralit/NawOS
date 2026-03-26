@@ -8,7 +8,7 @@
 uint8_t get_scancode(); 
 void init_keyboard();
 void start_text_editor(); 
-void keyboard_input();
+// void keyboard_input();
 void keyboard_handler();
 void keyboard_init();
 void keyboard_handle_scancode();
