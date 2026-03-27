@@ -11,29 +11,65 @@ static uint8_t transaction_id = 0x42;
 uint8_t broadcast_ip[4] = { 255, 255, 255, 255 };
 
 void net_send_udp_packet(uint8_t dest_ip[4], uint16_t src_port, uint16_t dst_port, uint8_t* data, size_t len) {
-   
+    uint8_t packet[1500];
+
+    memset(packet, 0xFF, 6); 
+    memcpy(packet + 6, naw_mac_address, 6);
+    packet[12] = 0x08;
+    packet[13] = 0x00;
+
+
+    uint8_t* ip = packet + 14;
+    ip[0] = 0x45;
+    ip[1] = 0x00;
+
+    uint16_t total_len = 20 + 8 + len;
+    ip[2] = total_len >> 8;
+    ip[3] = total_len & 0xFF;
+
+    ip[4] = ip[5] = 0;
+    ip[6] = ip[7] = 0;
+    ip[8] = 64;
+    ip[9] = 17; 
+
+    ip[10] = ip[11] = 0;
+
+    memcpy(ip + 12, naw_ip_address, 4);
+    memcpy(ip + 16, dest_ip, 4);
+
+
+    uint32_t sum = 0;
+    for (int i = 0; i < 20; i += 2)
+        sum += (ip[i] << 8) | ip[i+1];
+
+    while (sum >> 16)
+        sum = (sum & 0xFFFF) + (sum >> 16);
+
+    sum = ~sum;
+    ip[10] = sum >> 8;
+    ip[11] = sum & 0xFF;
+
+
+    uint8_t* udp = ip + 20;
+    udp[0] = src_port >> 8;
+    udp[1] = src_port & 0xFF;
+    udp[2] = dst_port >> 8;
+    udp[3] = dst_port & 0xFF;
+
+    uint16_t udp_len = 8 + len;
+    udp[4] = udp_len >> 8;
+    udp[5] = udp_len & 0xFF;
+
+    udp[6] = udp[7] = 0;
+
+    memcpy(udp + 8, data, len);
+
+    rtl8139_send_packet(packet, 14 + total_len);
 }
 
 void parse_dhcp_offer(uint8_t* packet, size_t size) {
-    // if (!(packet[236] == 0x63 && packet[237] == 0x82 &&
-    //       packet[238] == 0x53 && packet[239] == 0x63)) {
-    //     print("Not a valid DHCP packet\n");
-    //     return;
-    // }
+        int base = 14 + 20 + 8 + 16;
 
-    // for (int i = 0; i < 4; i++) {
-    //     naw_ip_address[i] = packet[16 + i];
-    // }
-
-    // print("Assigned IP: ");
-    // for (int i = 0; i < 4; i++) {
-    //     print_dec(naw_ip_address[i]);
-    //     if (i < 3) print(".");
-    // }
-    // print("\n");
-
-
-        int base = 42 + 16;
     for (int i = 0; i < 4; i++) {
         naw_ip_address[i] = packet[base + i];
     }
@@ -43,7 +79,7 @@ void parse_dhcp_offer(uint8_t* packet, size_t size) {
         print_dec(naw_ip_address[i]);
         if (i < 3) print(".");
     }
-        print("\n");
+    print("\n");
 }
 
 void dhcp_send_discover() {

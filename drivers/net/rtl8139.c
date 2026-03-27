@@ -37,6 +37,14 @@ void set_net_packet_flag() {
 static uint8_t rx_buffer[RX_BUFFER_SIZE + 16 + 1500];
 static uint32_t rx_cur = 0;
 
+void rtl8139_poll() {
+    uint16_t status = inw(io_base + RTL_ISR);
+
+    if (status & 0x01) {
+        net_packet_received = 1;
+        outw(io_base + RTL_ISR, 0x01);
+    }
+}
 
 uint8_t rtl_mac[6];
 //uint8_t rx_buffer[8192 + 16 + 1500] __attribute__((aligned(256)));
@@ -44,9 +52,9 @@ uint8_t rtl_mac[6];
 
 uint8_t* rtl8139_recv_packet(uint32_t* size) {
     uint16_t status = inw(io_base + RTL_ISR);
-    if (!(status & RTL_CMD_RECEIVE_OK)) {
-        return 0;
-    }
+        if (!(status & 0x01)) {
+            return 0;
+        }
 
 
     uint32_t offset = rx_cur;
@@ -61,8 +69,14 @@ uint8_t* rtl8139_recv_packet(uint32_t* size) {
     outw(io_base + RTL_RX_BUFFER_PTR, rx_cur - 16);
 
 
-    outw(io_base + RTL_ISR, RTL_CMD_RECEIVE_OK);
 
+    if (!(status & 0x01)){
+        return 0;
+    
+    }
+
+    outw(io_base + RTL_ISR, 0x01);
+print("PACKET RECEIVED\n");
     return packet;
 }
 
@@ -122,12 +136,12 @@ void rtl8139_init() {
         rtl_mac[i] = inb(io_base + RTL_MAC_REG + i);
     }
 
-    // print("MAC: ");
-    // for (int i = 0; i < 6; i++) {
-    //     print_hex(rtl_mac[i]);
-    //     if (i < 5) print(":");
-    // }
-    // print("\n");
+    print("MAC: ");
+    for (int i = 0; i < 6; i++) {
+        print_hex(rtl_mac[i]);
+        if (i < 5) print(":");
+    }
+    print("\n");
 
     outl(io_base + RTL_RX_BUF, (uint32_t)&rx_buffer[0]);
     outb(io_base + RTL_CMD_REG, RTL_CMD_RX_ENABLE | RTL_CMD_TX_ENABLE);
@@ -137,13 +151,6 @@ void rtl8139_init() {
     // print("RTL8139 initialized and ready.\n");
 }
 
-void rtl8139_poll() {
-    uint16_t status = inw(io_base + RTL_ISR);
-    if (status & 0x01) {
-        print("Packet received\n");
-        outw(io_base + RTL_ISR, 0x01);
-    }
-}
 
 void rtl8139_send_packet(void* data, uint32_t length) {
     if (length > 1792) return;

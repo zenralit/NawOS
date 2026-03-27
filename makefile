@@ -56,7 +56,8 @@ run: os-image.bin
 	-drive file=os-image.bin,format=raw,index=0,if=floppy \
 	-drive file=fs/nawfs.img,format=raw,if=ide,bus=0,unit=0 \
 	-netdev user,id=net0 \
-	-device rtl8139,netdev=net0 \
+	-netdev tap,id=n1,ifname=tap0,script=no,downscript=no \
+	-device rtl8139,netdev=n1 \
 	-serial mon:stdio
 
 clean:

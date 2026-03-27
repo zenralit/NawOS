@@ -264,13 +264,13 @@ void process_command(const char* input) {
             if (sc == 1) break; 
         }
         }
-        else if (strcmp(input, "ifconfig") == 0) {
+        else if (strcmp(input, "ipconfig") == 0) {
         print("IP Address: ");
-        //for (int i = 0; i < 4; i++) {
-            //print_dec(naw_ip_address[i]);
+        for (int i = 0; i < 4; i++) {
+            print_dec(naw_ip_address[i]);
                       
-          //  if (i < 3) print(".");
-        //}
+           if (i < 3) print(".");
+        }
         print_ip();
         print("\n");
     } else {

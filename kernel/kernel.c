@@ -51,12 +51,12 @@ void kernel_main() {
 //3.3 тестирование
 
     while (1) {
+        rtl8139_poll();
             asm volatile("hlt");
-
             if (net_packet_received) {
                 rtl8139_handle_receive();
                 net_packet_received = 0;
             }
-
+                
         }
 }
