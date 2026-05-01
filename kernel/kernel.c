@@ -9,14 +9,10 @@
 #include "drivers/disk/disk.h"
 #include "drivers/net/net.h"
 #include "drivers/net/rtl8139.h" 
-#include "drivers/net/dhcp.h"
 
-extern uint8_t naw_ip_address[4];
-extern volatile int net_packet_received;
 void dummy_timer_callback() {}
     
 void kernel_main() {
-    
     clear_screen();
     print("Welcome in NawOS. \n");
     print("print command >>>>\n");
@@ -24,21 +20,8 @@ void kernel_main() {
     keyboard_init();
     fs_init();
     rtl8139_init();
-    net_init();
     asm volatile("sti");
-    
-    
-    int tries = 5;
-    while (tries-- && naw_ip_address[0] == 0) {
-        dhcp_send_discover();
-
-        for (int i = 0; i < 100; i++) {
-            if (net_packet_received) {
-                rtl8139_handle_receive();
-                net_packet_received = 0;
-            }
-        }
-    }
+    net_init();
    
 //1.1 что такое ОС. состав ОС
 //1.2 какие ОС существуют
@@ -51,11 +34,8 @@ void kernel_main() {
 
     while (1) {
         rtl8139_poll();
-            asm volatile("hlt");
-            if (net_packet_received) {
-                rtl8139_handle_receive();
-                net_packet_received = 0;
-            }
-                
-        }
+        rtl8139_handle_receive();
+        net_periodic();
+        asm volatile("pause");
+    }
 }

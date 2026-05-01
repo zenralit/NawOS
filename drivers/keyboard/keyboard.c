@@ -5,6 +5,7 @@
 #include "drivers/disk/disk.h"
 #include "lib/math.h"
 #include <stddef.h>
+#include "drivers/net/net.h"
 #include "drivers/net/ip.h"
 #include "nawlang/parser.h"
 
@@ -35,6 +36,15 @@ static const char scancode_shift_map[128] = {
 };
 // -------- keyboard map -------- //
 
+static void print_ipv4_value(const uint8_t ip[4]) {
+    for (int i = 0; i < 4; i++) {
+        print_dec(ip[i]);
+        if (i < 3) {
+            print(".");
+        }
+    }
+}
+
 
 void process_command(const char* input) {
     if (strcmp(input, "help") == 0) {
@@ -51,6 +61,9 @@ void process_command(const char* input) {
         print("readsec <num> - Read disk sector\n");
         print("edit <name.ext> - text editor\n");
         print("calc <math exp> - solve a mathematical expression\n");
+        print("dhcp - Request a DHCP lease\n");
+        print("ipconfig - Show network configuration\n");
+        print("netmsg <text> - Broadcast UDP text\n");
     } else if(strcmp(input, "")==0){
         print("\n");
     }
@@ -264,14 +277,31 @@ void process_command(const char* input) {
             if (sc == 1) break; 
         }
         }
-        else if (strcmp(input, "ipconfig") == 0) {
-        print("IP Address: ");
-        for (int i = 0; i < 4; i++) {
-            print_dec(naw_ip_address[i]);
-                      
-           if (i < 3) print(".");
+        else if (strcmp(input, "dhcp") == 0) {
+        net_request_dhcp();
+    } else if (strncmp(input, "netmsg ", 7) == 0) {
+        if (input[7] == '\0') {
+            print("Usage: netmsg <text>\n");
+        } else {
+            net_send_text_broadcast(input + 7);
+            print("UDP broadcast sent\n");
         }
-        print_ip();
+    } else if (strcmp(input, "ipconfig") == 0) {
+        print("MAC: ");
+        for (int i = 0; i < 6; i++) {
+            print_hex(net_info.mac[i]);
+            if (i < 5) print(":");
+        }
+        print("\nIP Address: ");
+        print_ipv4_value(naw_ip_address);
+        print("\nGateway: ");
+        print_ipv4_value(net_info.gateway);
+        print("\nSubnet: ");
+        print_ipv4_value(net_info.subnet);
+        print("\nDHCP Server: ");
+        print_ipv4_value(net_info.dhcp_server);
+        print("\nStatus: ");
+        print(net_is_configured() ? "configured" : "pending");
         print("\n");
     } else {
         print("Unknown command. Type 'help' for help.\n");
