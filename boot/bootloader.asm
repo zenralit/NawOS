@@ -1,6 +1,11 @@
 [BITS 16]
 [ORG 0x7C00]
 
+%define KERNEL_LOAD_SECTORS 128
+%define KERNEL_LOAD_SEGMENT 0x1000
+%define KERNEL_LOAD_OFFSET 0x0000
+%define KERNEL_PROTECTED_ENTRY 0x10000
+
 start:
     cli
     xor ax, ax
@@ -20,14 +25,11 @@ start:
     jmp .print
                             
 .load:
-    mov ah, 0x02        ; функция чтения секторов
-    mov al, 50          ; количество секторов
-    mov ch, 0           ; цилиндр
-    mov cl, 10          ; сектор (начинается с 1)
-    mov dh, 0           ; головка
-    mov dl, 0x00        ; диск (0x00 для флоппи, 0x80 для HDD)
-    mov bx, 0x1000      ; адрес загрузки
-    int 0x13            ; BIOS прерывание
+    mov si, dap
+    mov dl, [boot_drive]
+    mov ah, 0x42
+    int 0x13
+    jc .disk_error
 
     in al,0x92
     or al,2
@@ -72,9 +74,16 @@ protected:
     mov ss,ax
     mov esp,0x90000
 
-    jmp 0x08:0x1000
+    jmp 0x08:KERNEL_PROTECTED_ENTRY
 
 boot_drive db 0
+dap:
+    db 0x10
+    db 0
+    dw KERNEL_LOAD_SECTORS
+    dw KERNEL_LOAD_OFFSET
+    dw KERNEL_LOAD_SEGMENT
+    dq 0x0000000000000001
 msg_load   db "Loading kernel...",0
 msg_err    db "Disk read error!",0
 

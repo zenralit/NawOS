@@ -17,7 +17,6 @@ void dummy_timer_callback() {}
     
 void kernel_main() {
     
-    keyboard_handle_interrupt();
     clear_screen();
     print("Welcome in NawOS. \n");
     print("print command >>>>\n");

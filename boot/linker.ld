@@ -1,8 +1,8 @@
-ENTRY(kernel_main)
+ENTRY(kernel_entry)
 
 SECTIONS
 {
-    . = 0x1000;
+    . = 0x10000;
 
     .text :
     {

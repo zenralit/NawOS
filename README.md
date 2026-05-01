@@ -38,7 +38,8 @@ sudo apt install build-essential nasm qemu-system make</code></pre>
   <ul>
     <li>Create, view, edit, and delete files using simple shell commands.</li>
     <li>Integrated text editor with minimal Vim-like behavior.</li>
-    <li>Persistent file storage using a virtual disk image (<code>nawfs.img</code>).</li>
+    <li>Persistent file storage lives on the same boot disk as the OS.</li>
+    <li>If the storage area is empty, NawOS formats NawFS automatically on first boot.</li>
   </ul>
 
   
