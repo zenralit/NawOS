@@ -15,8 +15,14 @@ extern void load_idt_register(struct IDTPtr*);
 extern void irq1_handler(); 
 extern void irq0_handler(); 
 extern void irq11_handler();
+extern void set_net_packet_flag();
 
 //set_idt_gate(0x2B, (uint32_t)irq11_handler);
+
+void irq11_handler_main() {
+    set_net_packet_flag();
+    send_eoi();
+}
 
 void set_idt_gate(int n, uint32_t handler) {
     idt[n].low_offset = handler & 0xFFFF;

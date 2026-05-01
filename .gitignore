@@ -1,0 +1,6 @@
+combined_code.txt
+kernel.bin
+boot/bootloader_iso.bin
+build/iso-root/
+nawos.iso
+nawos.vdi

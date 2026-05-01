@@ -135,8 +135,8 @@ void process_command(const char* input) {
         const char* dot = find_char(file, '.');
 
     if (dot && dot > file) {
-        char name[8] = { 0 };
-        char ext[3] = { 0 };
+        char name[9] = { 0 };
+        char ext[4] = { 0 };
 
     size_t namelen = dot - file;
         if (namelen > 8) namelen = 8;
@@ -264,13 +264,13 @@ void process_command(const char* input) {
             if (sc == 1) break; 
         }
         }
-        else if (strcmp(input, "ifconfig") == 0) {
+        else if (strcmp(input, "ipconfig") == 0) {
         print("IP Address: ");
-        //for (int i = 0; i < 4; i++) {
-            //print_dec(naw_ip_address[i]);
+        for (int i = 0; i < 4; i++) {
+            print_dec(naw_ip_address[i]);
                       
-          //  if (i < 3) print(".");
-        //}
+           if (i < 3) print(".");
+        }
         print_ip();
         print("\n");
     } else {
@@ -298,8 +298,7 @@ void handle_input(char c) {
     }
 }
 
-void keyboard_handle_scancode() {
-    uint8_t sc = inb(PORT_KBD_DATA);
+void keyboard_handle_scancode(uint8_t sc) {
     if (sc == 0) return;
 
     if (sc == 42 || sc == 54) {

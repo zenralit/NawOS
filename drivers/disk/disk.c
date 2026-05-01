@@ -12,6 +12,7 @@
 #define ATA_SR_BSY         0x80
 #define ATA_SR_DRQ         0x08
 #define ATA_SR_ERR         0x01
+#define DISK_MAX_LBA       4096
 
 int ata_wait() {
     int timeout = 100000;
@@ -41,7 +42,7 @@ int ata_wait() {
 }
 
 int disk_read_sector(int lba, uint8_t* buffer) {
-    if (lba < 0 || lba > 1024) {
+    if (lba < 0 || lba >= DISK_MAX_LBA) {
         print("disk_read_sector: LBA out of range\n");
         return -1;
     }
@@ -67,6 +68,11 @@ int disk_read_sector(int lba, uint8_t* buffer) {
 }
 
 int disk_write_sector(int lba, const uint8_t* buffer) {
+    if (lba < 0 || lba >= DISK_MAX_LBA) {
+        print("disk_write_sector: LBA out of range\n");
+        return -1;
+    }
+
     outb(ATA_PRIMARY_IO + 6, 0xE0 | ((lba >> 24) & 0x0F));
     outb(ATA_PRIMARY_IO + 2, 1);
     outb(ATA_PRIMARY_IO + 3, (uint8_t)(lba));

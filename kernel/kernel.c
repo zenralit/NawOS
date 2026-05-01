@@ -17,7 +17,6 @@ void dummy_timer_callback() {}
     
 void kernel_main() {
     
-    keyboard_handle_interrupt();
     clear_screen();
     print("Welcome in NawOS. \n");
     print("print command >>>>\n");
@@ -51,12 +50,12 @@ void kernel_main() {
 //3.3 тестирование
 
     while (1) {
+        rtl8139_poll();
             asm volatile("hlt");
-
             if (net_packet_received) {
                 rtl8139_handle_receive();
                 net_packet_received = 0;
             }
-
+                
         }
 }
