@@ -1,13 +1,11 @@
 [GLOBAL irq11]
-[EXTERN irq11_handler]
-
 [EXTERN send_eoi]
-[EXTERN set_net_packet_flag]
+[EXTERN rtl8139_handle_irq]
 
 irq11:
     cli
     pusha
-    call set_net_packet_flag
+    call rtl8139_handle_irq
     call send_eoi
     popa
     sti

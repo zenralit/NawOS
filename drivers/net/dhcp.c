@@ -1,133 +1,231 @@
 #include "dhcp.h"
 #include "drivers/screen/screen.h"
 #include "ip.h"
-#include <stddef.h>
 #include "net.h"
-#include "rtl8139.h"
-#include "lib/nawstring.h"
 #include <string.h>
 
-static uint8_t transaction_id = 0x42; 
-uint8_t broadcast_ip[4] = { 255, 255, 255, 255 };
+#define DHCP_CLIENT_PORT 68
+#define DHCP_SERVER_PORT 67
+#define DHCP_FIXED_HEADER_SIZE 240
 
-void net_send_udp_packet(uint8_t dest_ip[4], uint16_t src_port, uint16_t dst_port, uint8_t* data, size_t len) {
-    uint8_t packet[1500];
+static const uint8_t zero_ip[4] = {0, 0, 0, 0};
+static const uint8_t broadcast_ip[4] = {255, 255, 255, 255};
+static const uint8_t dhcp_transaction_id[4] = {0x4E, 0x41, 0x57, 0x01};
 
-    memset(packet, 0xFF, 6); 
-    memcpy(packet + 6, naw_mac_address, 6);
-    packet[12] = 0x08;
-    packet[13] = 0x00;
+static uint8_t offered_ip[4];
+static uint8_t server_id[4];
+static int dhcp_bound = 0;
 
-
-    uint8_t* ip = packet + 14;
-    ip[0] = 0x45;
-    ip[1] = 0x00;
-
-    uint16_t total_len = 20 + 8 + len;
-    ip[2] = total_len >> 8;
-    ip[3] = total_len & 0xFF;
-
-    ip[4] = ip[5] = 0;
-    ip[6] = ip[7] = 0;
-    ip[8] = 64;
-    ip[9] = 17; 
-
-    ip[10] = ip[11] = 0;
-
-    memcpy(ip + 12, naw_ip_address, 4);
-    memcpy(ip + 16, dest_ip, 4);
-
-
-    uint32_t sum = 0;
-    for (int i = 0; i < 20; i += 2)
-        sum += (ip[i] << 8) | ip[i+1];
-
-    while (sum >> 16)
-        sum = (sum & 0xFFFF) + (sum >> 16);
-
-    sum = ~sum;
-    ip[10] = sum >> 8;
-    ip[11] = sum & 0xFF;
-
-
-    uint8_t* udp = ip + 20;
-    udp[0] = src_port >> 8;
-    udp[1] = src_port & 0xFF;
-    udp[2] = dst_port >> 8;
-    udp[3] = dst_port & 0xFF;
-
-    uint16_t udp_len = 8 + len;
-    udp[4] = udp_len >> 8;
-    udp[5] = udp_len & 0xFF;
-
-    udp[6] = udp[7] = 0;
-
-    memcpy(udp + 8, data, len);
-
-    rtl8139_send_packet(packet, 14 + total_len);
+static void print_ipv4(const uint8_t ip[4]) {
+    for (int i = 0; i < 4; i++) {
+        print_dec(ip[i]);
+        if (i < 3) {
+            print(".");
+        }
+    }
 }
 
-void parse_dhcp_offer(uint8_t* packet, size_t size) {
-        int base = 14 + 20 + 8 + 16;
-
-    for (int i = 0; i < 4; i++) {
-        naw_ip_address[i] = packet[base + i];
-    }
-
-    print("Assigned IP: ");
-    for (int i = 0; i < 4; i++) {
-        print_dec(naw_ip_address[i]);
-        if (i < 3) print(".");
-    }
-    print("\n");
+static int is_same_mac(const uint8_t* packet) {
+    return memcmp(packet + 28, naw_mac_address, 6) == 0;
 }
 
-void dhcp_send_discover() {
-    uint8_t packet[548];
-    memset(packet, 0, sizeof(packet));
+static void dhcp_write_header(uint8_t* packet) {
+    memset(packet, 0, 548);
 
-    packet[0] = 0x01; 
-    packet[1] = 0x01; 
+    packet[0] = 0x01;
+    packet[1] = 0x01;
     packet[2] = 0x06;
-    packet[3] = 0x00; 
-    packet[4] = 0x00; packet[5] = 0x00; packet[6] = 0x00; packet[7] = transaction_id; // xid
-    packet[8] = packet[9] = packet[10] = packet[11] = 0x00; // seconds + flags
-    packet[20] = packet[21] = packet[22] = packet[23] = 0x00; 
-    packet[12] = packet[13] = packet[14] = packet[15] = 0x00; 
-    packet[16] = packet[17] = packet[18] = packet[19] = 0x00; 
-    packet[24] = packet[25] = packet[26] = packet[27] = 0x00; 
+    packet[3] = 0x00;
+    memcpy(packet + 4, dhcp_transaction_id, sizeof(dhcp_transaction_id));
+    packet[10] = 0x80;
+    packet[11] = 0x00;
+    memcpy(packet + 28, naw_mac_address, 6);
 
-
-    for (int i = 0; i < 6; i++) {
-        packet[28 + i] = naw_mac_address[i];
-    }
-
-    
     packet[236] = 0x63;
     packet[237] = 0x82;
     packet[238] = 0x53;
     packet[239] = 0x63;
+}
 
-   
-    int i = 240;
-    packet[i++] = 53; 
-    packet[i++] = 1;
-    packet[i++] = 1;  
+static const uint8_t* dhcp_find_option(const uint8_t* options, size_t options_len, uint8_t code, uint8_t* option_len) {
+    size_t offset = 0;
 
-    packet[i++] = 55; // Parameter Request List
-    packet[i++] = 3;
-    packet[i++] = 1;  // subnet mask
-    packet[i++] = 3;  // router
-    packet[i++] = 6;  // DNS
+    while (offset < options_len) {
+        uint8_t option_code = options[offset++];
 
-    packet[i++] = 255; 
+        if (option_code == 0) {
+            continue;
+        }
 
-   
-    net_send_udp_packet(
-        broadcast_ip,    
-        68,               
-        67,              
-        packet,
-        i
-    );
+        if (option_code == 255) {
+            break;
+        }
+
+        if (offset >= options_len) {
+            break;
+        }
+
+        uint8_t len = options[offset++];
+        if (offset + len > options_len) {
+            break;
+        }
+
+        if (option_code == code) {
+            *option_len = len;
+            return options + offset;
+        }
+
+        offset += len;
+    }
+
+    return 0;
+}
+
+static void dhcp_send_request() {
+    uint8_t packet[548];
+    int index = DHCP_FIXED_HEADER_SIZE;
+
+    dhcp_write_header(packet);
+
+    packet[index++] = 53;
+    packet[index++] = 1;
+    packet[index++] = 3;
+
+    packet[index++] = 50;
+    packet[index++] = 4;
+    memcpy(packet + index, offered_ip, 4);
+    index += 4;
+
+    packet[index++] = 54;
+    packet[index++] = 4;
+    memcpy(packet + index, server_id, 4);
+    index += 4;
+
+    packet[index++] = 55;
+    packet[index++] = 4;
+    packet[index++] = 1;
+    packet[index++] = 3;
+    packet[index++] = 6;
+    packet[index++] = 54;
+    packet[index++] = 255;
+
+    net_send_udp_packet(zero_ip, broadcast_ip, DHCP_CLIENT_PORT, DHCP_SERVER_PORT, packet, (size_t)index);
+}
+
+void dhcp_init() {
+    memset(offered_ip, 0, sizeof(offered_ip));
+    memset(server_id, 0, sizeof(server_id));
+    dhcp_bound = 0;
+}
+
+int dhcp_is_configured() {
+    return dhcp_bound;
+}
+
+void dhcp_send_discover() {
+    uint8_t packet[548];
+    int index = DHCP_FIXED_HEADER_SIZE;
+
+    dhcp_bound = 0;
+    dhcp_write_header(packet);
+
+    packet[index++] = 53;
+    packet[index++] = 1;
+    packet[index++] = 1;
+
+    packet[index++] = 55;
+    packet[index++] = 4;
+    packet[index++] = 1;
+    packet[index++] = 3;
+    packet[index++] = 6;
+    packet[index++] = 54;
+    packet[index++] = 255;
+
+    net_send_udp_packet(zero_ip, broadcast_ip, DHCP_CLIENT_PORT, DHCP_SERVER_PORT, packet, (size_t)index);
+}
+
+void dhcp_handle_udp_packet(const uint8_t* packet, size_t size) {
+    const uint8_t* options;
+    const uint8_t* message_type;
+    const uint8_t* server_option;
+    const uint8_t* subnet_option;
+    const uint8_t* router_option;
+    uint8_t option_len = 0;
+
+    if (size < DHCP_FIXED_HEADER_SIZE) {
+        return;
+    }
+
+    if (packet[0] != 0x02 || packet[1] != 0x01 || packet[2] != 0x06) {
+        return;
+    }
+
+    if (memcmp(packet + 4, dhcp_transaction_id, sizeof(dhcp_transaction_id)) != 0) {
+        return;
+    }
+
+    if (!is_same_mac(packet)) {
+        return;
+    }
+
+    options = packet + DHCP_FIXED_HEADER_SIZE;
+    message_type = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 53, &option_len);
+    if (!message_type || option_len != 1) {
+        return;
+    }
+
+    if (message_type[0] == 2) {
+        server_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 54, &option_len);
+        if (!server_option || option_len != 4) {
+            return;
+        }
+
+        memcpy(offered_ip, packet + 16, 4);
+        memcpy(server_id, server_option, 4);
+
+        print("DHCPOFFER ");
+        print_ipv4(offered_ip);
+        print("\n");
+
+        dhcp_send_request();
+        return;
+    }
+
+    if (message_type[0] == 5) {
+        memcpy(naw_ip_address, packet + 16, 4);
+        memcpy(net_info.ip, packet + 16, 4);
+
+        subnet_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 1, &option_len);
+        if (subnet_option && option_len == 4) {
+            memcpy(net_info.subnet, subnet_option, 4);
+        }
+
+        router_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 3, &option_len);
+        if (router_option && option_len >= 4) {
+            memcpy(net_info.gateway, router_option, 4);
+        }
+
+        server_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 54, &option_len);
+        if (server_option && option_len == 4) {
+            memcpy(net_info.dhcp_server, server_option, 4);
+        } else {
+            memcpy(net_info.dhcp_server, server_id, 4);
+        }
+
+        net_info.configured = 1;
+        dhcp_bound = 1;
+
+        print("DHCPACK IP ");
+        print_ipv4(naw_ip_address);
+        print(" GW ");
+        print_ipv4(net_info.gateway);
+        print("\n");
+        return;
+    }
+
+    if (message_type[0] == 6) {
+        print("DHCPNAK received\n");
+        dhcp_bound = 0;
+        net_info.configured = 0;
+    }
 }

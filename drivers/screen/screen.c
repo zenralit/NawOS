@@ -4,8 +4,9 @@
 #include "drivers/net/ip.h"
 
 #define VGA_ADDRESS 0xB8000
-#define MAX_ROWS 25
-#define MAX_COLS 80
+#define MAX_ROWS SCREEN_ROWS
+#define MAX_COLS SCREEN_COLS
+#define SCROLLBACK_ROWS 96
 #define WHITE_ON_BLACK 0x0F
 #define VIDEO_ADDRESS 0xB8000
 
@@ -14,57 +15,300 @@ extern uint16_t cursor_offset;
 uint16_t cursor_offset = 0;
 int cursor_x = 0;
 int cursor_y = 0;
+static uint16_t screen_history[SCROLLBACK_ROWS][MAX_COLS];
+static uint8_t line_lengths[SCROLLBACK_ROWS];
+static uint8_t line_wrapped[SCROLLBACK_ROWS];
+static int cursor_row = 0;
+static int cursor_col = 0;
+static int total_rows = 1;
+static int view_top_row = 0;
+static int render_batch_depth = 0;
+static int render_pending = 0;
 
 int16_t get_cursor_offset() {
-    port_byte_out(0x3D4, 14);
-    uint16_t offset = port_byte_in(0x3D5) << 8;
-    port_byte_out(0x3D4, 15);
-    offset += port_byte_in(0x3D5);
-    return offset;
+    return cursor_offset / 2;
+}
+
+static uint16_t make_cell(char c) {
+    return (WHITE_ON_BLACK << 8) | (uint8_t)c;
+}
+
+static void clear_history_row(int row) {
+    for (int col = 0; col < MAX_COLS; col++) {
+        screen_history[row][col] = make_cell(' ');
+    }
+    line_lengths[row] = 0;
+    line_wrapped[row] = 0;
+}
+
+static void reset_history_buffer() {
+    for (int row = 0; row < SCROLLBACK_ROWS; row++) {
+        clear_history_row(row);
+    }
+}
+
+static void shift_history_up() {
+    for (int row = 1; row < SCROLLBACK_ROWS; row++) {
+        for (int col = 0; col < MAX_COLS; col++) {
+            screen_history[row - 1][col] = screen_history[row][col];
+        }
+        line_lengths[row - 1] = line_lengths[row];
+        line_wrapped[row - 1] = line_wrapped[row];
+    }
+
+    clear_history_row(SCROLLBACK_ROWS - 1);
+
+    if (cursor_row > 0) {
+        cursor_row--;
+    }
+    if (total_rows > 1) {
+        total_rows--;
+    }
+    if (view_top_row > 0) {
+        view_top_row--;
+    }
+}
+
+static int live_view_top_row() {
+    if (total_rows <= MAX_ROWS) {
+        return 0;
+    }
+    return total_rows - MAX_ROWS;
+}
+
+static void sync_view_to_bottom() {
+    view_top_row = live_view_top_row();
+}
+
+static void ensure_cursor_visible() {
+    if (cursor_row < view_top_row) {
+        view_top_row = cursor_row;
+    } else if (cursor_row >= view_top_row + MAX_ROWS) {
+        view_top_row = cursor_row - MAX_ROWS + 1;
+    }
+}
+
+static void render_view() {
+    for (int row = 0; row < MAX_ROWS; row++) {
+        int history_row = view_top_row + row;
+
+        for (int col = 0; col < MAX_COLS; col++) {
+            if (history_row < total_rows) {
+                VIDEO_MEMORY[row * MAX_COLS + col] = screen_history[history_row][col];
+            } else {
+                VIDEO_MEMORY[row * MAX_COLS + col] = make_cell(' ');
+            }
+        }
+    }
+
+    if (cursor_row >= view_top_row && cursor_row < view_top_row + MAX_ROWS) {
+        cursor_offset = ((cursor_row - view_top_row) * MAX_COLS + cursor_col) * 2;
+    } else {
+        cursor_offset = ((MAX_ROWS - 1) * MAX_COLS + (MAX_COLS - 1)) * 2;
+    }
+
+    cursor_x = cursor_col;
+    cursor_y = cursor_row;
+    update_cursor();
+}
+
+static void request_render() {
+    if (render_batch_depth > 0) {
+        render_pending = 1;
+        return;
+    }
+
+    render_view();
+}
+
+static void ensure_history_room() {
+    if (cursor_row >= SCROLLBACK_ROWS) {
+        shift_history_up();
+        cursor_row = SCROLLBACK_ROWS - 1;
+    }
+
+    if (cursor_row >= total_rows) {
+        total_rows = cursor_row + 1;
+    }
+}
+
+static void advance_to_next_row() {
+    cursor_col = 0;
+    cursor_row++;
+    ensure_history_room();
+    clear_history_row(cursor_row);
 }
 
 void set_cursor_offset(uint16_t offset) {
-    port_byte_out(0x3D4, 14);
-    port_byte_out(0x3D5, (offset >> 8) & 0xFF);
-    port_byte_out(0x3D4, 15);
-    port_byte_out(0x3D5, offset & 0xFF);
+    if (offset >= MAX_ROWS * MAX_COLS) {
+        offset = (MAX_ROWS * MAX_COLS) - 1;
+    }
+
+    cursor_row = view_top_row + (offset / MAX_COLS);
+    cursor_col = offset % MAX_COLS;
+    ensure_history_room();
+    request_render();
 }
 
 void move_cursor_left() {
-    uint16_t offset = get_cursor_offset();
-    if (offset > 0) set_cursor_offset(offset - 1);
+    if (cursor_col > 0) {
+        cursor_col--;
+    } else if (cursor_row > 0) {
+        int prev_row = cursor_row - 1;
+        cursor_row = prev_row;
+        cursor_col = line_wrapped[prev_row] ? (MAX_COLS - 1) : line_lengths[prev_row];
+    } else {
+        return;
+    }
+
+    ensure_cursor_visible();
+    request_render();
 }
 
 void move_cursor_right() {
-    uint16_t offset = get_cursor_offset();
-    if (offset < 80 * 25 - 1) set_cursor_offset(offset + 1);
+    if (line_wrapped[cursor_row]) {
+        if (cursor_col < MAX_COLS - 1) {
+            cursor_col++;
+        } else if (cursor_row + 1 < total_rows) {
+            cursor_row++;
+            cursor_col = 0;
+        } else {
+            return;
+        }
+    } else if (cursor_col < line_lengths[cursor_row]) {
+        cursor_col++;
+    } else if (cursor_row + 1 < total_rows) {
+        cursor_row++;
+        cursor_col = 0;
+    } else {
+        return;
+    }
+
+    ensure_cursor_visible();
+    request_render();
+}
+
+void screen_set_cursor_absolute(int row, int col) {
+    if (row < 0) {
+        row = 0;
+    }
+    if (row >= total_rows) {
+        row = total_rows - 1;
+    }
+    if (row < 0) {
+        row = 0;
+    }
+
+    if (col < 0) {
+        col = 0;
+    }
+    if (col >= MAX_COLS) {
+        col = MAX_COLS - 1;
+    }
+
+    cursor_row = row;
+    cursor_col = col;
+    ensure_cursor_visible();
+    request_render();
+}
+
+void screen_begin_batch() {
+    render_batch_depth++;
+}
+
+void screen_end_batch() {
+    if (render_batch_depth == 0) {
+        return;
+    }
+
+    render_batch_depth--;
+    if (render_batch_depth == 0 && render_pending) {
+        render_pending = 0;
+        render_view();
+    }
 }
 
 void clear_screen() {
-     for (int i = 0; i < 80 * 25; i++) {
-        VIDEO_MEMORY[i] = (WHITE_ON_BLACK << 8) | ' ';
-    }
+    reset_history_buffer();
+    cursor_row = 0;
+    cursor_col = 0;
+    total_rows = 1;
+    view_top_row = 0;
     cursor_offset = 0;
+    request_render();
+}
+
+void screen_scroll_page_up() {
+    if (view_top_row == 0) {
+        return;
+    }
+
+    view_top_row -= MAX_ROWS;
+    if (view_top_row < 0) {
+        view_top_row = 0;
+    }
+
+    request_render();
+}
+
+void screen_scroll_page_down() {
+    int bottom_view = live_view_top_row();
+
+    if (view_top_row >= bottom_view) {
+        return;
+    }
+
+    view_top_row += MAX_ROWS;
+    if (view_top_row > bottom_view) {
+        view_top_row = bottom_view;
+    }
+
+    request_render();
 }
 
 void put_char(char c) {
     if (c == '\n') {
-        cursor_offset += (MAX_COLS * 2) - (cursor_offset % (MAX_COLS * 2));
+        line_lengths[cursor_row] = cursor_col;
+        line_wrapped[cursor_row] = 0;
+        advance_to_next_row();
     } else if (c == '\b') {
-        if (cursor_offset >= 2) {
-            cursor_offset -= 2;
-            VIDEO_MEMORY[cursor_offset / 2] = (WHITE_ON_BLACK << 8) | ' ';
+        if (cursor_row > 0 || cursor_col > 0) {
+            if (cursor_col > 0) {
+                cursor_col--;
+            } else {
+                int prev_row = cursor_row - 1;
+                cursor_row = prev_row;
+                cursor_col = line_wrapped[prev_row] ? (MAX_COLS - 1) : line_lengths[prev_row];
+            }
+
+            if (cursor_col < 0) {
+                cursor_col = 0;
+            }
+
+            if (line_wrapped[cursor_row] && cursor_col == MAX_COLS - 1) {
+                line_wrapped[cursor_row] = 0;
+                line_lengths[cursor_row] = MAX_COLS - 1;
+            } else {
+                line_lengths[cursor_row] = cursor_col;
+            }
+
+            screen_history[cursor_row][cursor_col] = make_cell(' ');
         }
     } else {
-        VIDEO_MEMORY[cursor_offset / 2] = (WHITE_ON_BLACK << 8) | c;
-        cursor_offset += 2;
+        screen_history[cursor_row][cursor_col] = make_cell(c);
+        cursor_col++;
+        line_lengths[cursor_row] = cursor_col;
+
+        if (cursor_col >= MAX_COLS) {
+            line_wrapped[cursor_row] = 1;
+            advance_to_next_row();
+        } else {
+            line_wrapped[cursor_row] = 0;
+        }
     }
 
-    if (cursor_offset >= MAX_ROWS * MAX_COLS * 2) {
-        clear_screen();  
-    }
-
-    update_cursor();
+    sync_view_to_bottom();
+    request_render();
 }
 
 void print(const char* str) {
@@ -85,11 +329,17 @@ void update_cursor() {
     outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }
 
-uint8_t get_scancode() {
+uint16_t get_scancode() {
+    if ((inb(0x64) & 0x01) == 0) {
+        return 0;
+    }
+
     uint8_t sc = inb(0x60);
     if (sc == 0xE0) {
+        while ((inb(0x64) & 0x01) == 0) {
+        }
         uint8_t next = inb(0x60);
-        return (0xE0 << 8) | next;
+        return 0xE000 | next;
     }
     return sc;
 }

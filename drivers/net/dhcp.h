@@ -4,8 +4,9 @@
 #define DHCP_H
 
 
+void dhcp_init();
 void dhcp_send_discover();
-
-void parse_dhcp_offer(uint8_t* packet, size_t size);
+void dhcp_handle_udp_packet(const uint8_t* packet, size_t size);
+int dhcp_is_configured();
 
 #endif

@@ -5,18 +5,28 @@
 #include "drivers/disk/disk.h"
 #include "lib/math.h"
 #include <stddef.h>
+#include "drivers/net/net.h"
 #include "drivers/net/ip.h"
 #include "nawlang/parser.h"
 
 #define INPUT_BUFFER_SIZE 256
 #define MAX_INPUT 128
 #define PORT_KBD_DATA 0x60
+#define EDITOR_BUFFER_SIZE 512
+#define EDITOR_TEXT_START_ROW 3
+#define EXTENDED_SCANCODE_PREFIX 0xE0
+#define EXTENDED_KEY_UP 0x48
+#define EXTENDED_KEY_DOWN 0x50
+#define EXTENDED_KEY_LEFT 0x4B
+#define EXTENDED_KEY_RIGHT 0x4D
 
 char input_buffer[INPUT_BUFFER_SIZE];
 int input_pos = 0;
 uint8_t key_pressed[128] = {0};
 int shift_pressed = 0;
 uint8_t key_down[256] = {0};
+static uint8_t extended_key_down[128] = {0};
+static uint8_t extended_scancode_prefix = 0;
 
 // -------- keyboard map -------- //
 static const char scancode_map[128] = {
@@ -35,6 +45,131 @@ static const char scancode_shift_map[128] = {
 };
 // -------- keyboard map -------- //
 
+static void print_ipv4_value(const uint8_t ip[4]) {
+    for (int i = 0; i < 4; i++) {
+        print_dec(ip[i]);
+        if (i < 3) {
+            print(".");
+        }
+    }
+}
+
+static void reset_keyboard_state() {
+    for (int i = 0; i < 256; i++) {
+        key_down[i] = 0;
+    }
+
+    for (int i = 0; i < 128; i++) {
+        extended_key_down[i] = 0;
+    }
+
+    shift_pressed = 0;
+    extended_scancode_prefix = 0;
+}
+
+static void editor_step_visual_position(char c, int* row, int* col) {
+    if (c == '\n') {
+        (*row)++;
+        *col = 0;
+        return;
+    }
+
+    (*col)++;
+    if (*col >= SCREEN_COLS) {
+        (*row)++;
+        *col = 0;
+    }
+}
+
+static void editor_get_visual_position(const char* buffer, int cursor, int* row, int* col) {
+    *row = EDITOR_TEXT_START_ROW;
+    *col = 0;
+
+    for (int i = 0; i < cursor; i++) {
+        editor_step_visual_position(buffer[i], row, col);
+    }
+}
+
+static int editor_index_from_visual_position(const char* buffer, int len, int target_row, int target_col) {
+    int row = EDITOR_TEXT_START_ROW;
+    int col = 0;
+    int best_index = -1;
+
+    for (int i = 0; i <= len; i++) {
+        if (row == target_row) {
+            best_index = i;
+            if (col >= target_col) {
+                return i;
+            }
+        } else if (row > target_row) {
+            break;
+        }
+
+        if (i == len) {
+            break;
+        }
+
+        editor_step_visual_position(buffer[i], &row, &col);
+    }
+
+    return best_index;
+}
+
+static int editor_insert_char(char* buffer, int* len, int* cursor, char c) {
+    if (*len >= EDITOR_BUFFER_SIZE - 1) {
+        return 0;
+    }
+
+    for (int i = *len; i >= *cursor; i--) {
+        buffer[i + 1] = buffer[i];
+    }
+
+    buffer[*cursor] = c;
+    (*len)++;
+    (*cursor)++;
+    return 1;
+}
+
+static int editor_delete_char(char* buffer, int* len, int* cursor) {
+    if (*cursor <= 0) {
+        return 0;
+    }
+
+    for (int i = *cursor - 1; i < *len; i++) {
+        buffer[i] = buffer[i + 1];
+    }
+
+    (*cursor)--;
+    (*len)--;
+    return 1;
+}
+
+static void editor_render(const char* name, const char* ext, const char* buffer, int len, int cursor, const char* status_message) {
+    int cursor_row;
+    int cursor_col;
+
+    screen_begin_batch();
+    clear_screen();
+    print("Editing: ");
+    print(name);
+    print(".");
+    print(ext);
+    print("\n");
+    print("F2 = save, ESC = exit\n");
+    if (status_message && status_message[0]) {
+        print(status_message);
+    }
+    print("\n");
+
+    for (int i = 0; i < len; i++) {
+        put_char(buffer[i]);
+    }
+
+    editor_get_visual_position(buffer, cursor, &cursor_row, &cursor_col);
+    screen_set_cursor_absolute(cursor_row, cursor_col);
+    screen_end_batch();
+}
+
 
 void process_command(const char* input) {
     if (strcmp(input, "help") == 0) {
@@ -51,6 +186,9 @@ void process_command(const char* input) {
         print("readsec <num> - Read disk sector\n");
         print("edit <name.ext> - text editor\n");
         print("calc <math exp> - solve a mathematical expression\n");
+        print("dhcp - Request a DHCP lease\n");
+        print("ipconfig - Show network configuration\n");
+        print("netmsg <text> - Broadcast UDP text\n");
     } else if(strcmp(input, "")==0){
         print("\n");
     }
@@ -264,14 +402,31 @@ void process_command(const char* input) {
             if (sc == 1) break; 
         }
         }
-        else if (strcmp(input, "ipconfig") == 0) {
-        print("IP Address: ");
-        for (int i = 0; i < 4; i++) {
-            print_dec(naw_ip_address[i]);
-                      
-           if (i < 3) print(".");
+        else if (strcmp(input, "dhcp") == 0) {
+        net_request_dhcp();
+    } else if (strncmp(input, "netmsg ", 7) == 0) {
+        if (input[7] == '\0') {
+            print("Usage: netmsg <text>\n");
+        } else {
+            net_send_text_broadcast(input + 7);
+            print("UDP broadcast sent\n");
         }
-        print_ip();
+    } else if (strcmp(input, "ipconfig") == 0) {
+        print("MAC: ");
+        for (int i = 0; i < 6; i++) {
+            print_hex(net_info.mac[i]);
+            if (i < 5) print(":");
+        }
+        print("\nIP Address: ");
+        print_ipv4_value(naw_ip_address);
+        print("\nGateway: ");
+        print_ipv4_value(net_info.gateway);
+        print("\nSubnet: ");
+        print_ipv4_value(net_info.subnet);
+        print("\nDHCP Server: ");
+        print_ipv4_value(net_info.dhcp_server);
+        print("\nStatus: ");
+        print(net_is_configured() ? "configured" : "pending");
         print("\n");
     } else {
         print("Unknown command. Type 'help' for help.\n");
@@ -298,8 +453,30 @@ void handle_input(char c) {
     }
 }
 
-void keyboard_handle_scancode(uint8_t sc) {
+void keyboard_handle_scancode(uint16_t sc) {
     if (sc == 0) return;
+
+    if (sc > 0xFF) {
+        uint8_t ext = sc & 0xFF;
+        uint8_t key = ext & 0x7F;
+
+        if (ext & 0x80) {
+            extended_key_down[key] = 0;
+            return;
+        }
+
+        if (extended_key_down[key]) {
+            return;
+        }
+        extended_key_down[key] = 1;
+
+        if (ext == EXTENDED_KEY_UP) {
+            screen_scroll_page_up();
+        } else if (ext == EXTENDED_KEY_DOWN) {
+            screen_scroll_page_down();
+        }
+        return;
+    }
 
     if (sc == 42 || sc == 54) {
         shift_pressed = 1;
@@ -366,7 +543,23 @@ int atoi(const char* str) {
 
 void keyboard_handle_interrupt() {  
     uint8_t scancode = port_byte_in(0x60);
-    keyboard_handle_scancode(scancode); 
+    uint16_t full_scancode;
+
+    if (scancode == EXTENDED_SCANCODE_PREFIX) {
+        extended_scancode_prefix = 1;
+        port_byte_out(0x20, 0x20);
+        return;
+    }
+
+    if (extended_scancode_prefix) {
+        full_scancode = 0xE000 | scancode;
+        extended_scancode_prefix = 0;
+    } else {
+        full_scancode = scancode;
+    }
+
+    keyboard_handle_scancode(full_scancode);
+
     port_byte_out(0x20, 0x20); 
 }
 
@@ -407,107 +600,166 @@ int strncmp(const char* s1, const char* s2, size_t n) {
 }
 
 void start_text_editor(const char* name, const char* ext) {
-    clear_screen();
-    print("Editing: ");
-    print(name); print("."); print(ext);
-    print("\n[Type text, ESC = exit, F2 = save]\n");
+    char buffer[EDITOR_BUFFER_SIZE] = {0};
+    const char* status_message = "";
+    int len = 0;
+    int cursor = 0;
+    int loaded;
+    uint8_t local_key_down[128] = {0};
+    uint8_t local_extended_key_down[128] = {0};
+    int local_shift_pressed = 0;
 
-    int pos = 0;
-    char buffer[512] = {0};
-
-    int loaded = fs_read_to_buffer(name, ext, buffer, sizeof(buffer));
+    loaded = fs_read_to_buffer(name, ext, buffer, sizeof(buffer));
     if (loaded >= 0) {
-        print("file content:\n");
-        for (int i = 0; buffer[i] != '\0' && i < sizeof(buffer); i++) {
-            put_char(buffer[i]);
-            pos++;
-        }
+        len = loaded;
+        cursor = len;
     } else {
-        print("New file\n");
+        status_message = "New file";
     }
 
-    update_cursor();
-
-    uint8_t key_down[128] = {0};
-    int shift_pressed = 0;
+    reset_keyboard_state();
+    editor_render(name, ext, buffer, len, cursor, status_message);
 
     while (1) {
-    uint16_t full_sc = get_scancode();
-    if (full_sc == 0) continue;
+        uint16_t full_sc = get_scancode();
+        uint8_t sc;
 
-    uint8_t sc = full_sc & 0xFF;
-   // uint8_t pref = full_sc >> 8;
+        if (full_sc == 0) {
+            continue;
+        }
 
-    if(sc == 0xF){
-       print("    ");
-       
-    }
+        if (full_sc > 0xFF) {
+            uint8_t ext_sc = full_sc & 0xFF;
+            uint8_t key = ext_sc & 0x7F;
 
-    if (full_sc == 0x004B) { // ←
-       move_cursor_left();
-        continue;
-    } else if (full_sc == 0x004D) { // →
-         move_cursor_right();
-        continue;
-    }
+            if (ext_sc & 0x80) {
+                local_extended_key_down[key] = 0;
+                continue;
+            }
+
+            if (local_extended_key_down[key]) {
+                continue;
+            }
+            local_extended_key_down[key] = 1;
+
+            if (ext_sc == EXTENDED_KEY_LEFT && cursor > 0) {
+                cursor--;
+            } else if (ext_sc == EXTENDED_KEY_RIGHT && cursor < len) {
+                cursor++;
+            } else if (ext_sc == EXTENDED_KEY_UP) {
+                int row;
+                int col;
+                int next_cursor;
+
+                editor_get_visual_position(buffer, cursor, &row, &col);
+                next_cursor = editor_index_from_visual_position(buffer, len, row - 1, col);
+                if (next_cursor >= 0) {
+                    cursor = next_cursor;
+                }
+            } else if (ext_sc == EXTENDED_KEY_DOWN) {
+                int row;
+                int col;
+                int next_cursor;
+
+                editor_get_visual_position(buffer, cursor, &row, &col);
+                next_cursor = editor_index_from_visual_position(buffer, len, row + 1, col);
+                if (next_cursor >= 0) {
+                    cursor = next_cursor;
+                }
+            }
+
+            editor_render(name, ext, buffer, len, cursor, status_message);
+            continue;
+        }
+
+        sc = full_sc & 0xFF;
+
         if (sc & 0x80) {
             uint8_t key = sc & 0x7F;
-            key_down[key] = 0;
+            if (key < 128) {
+                local_key_down[key] = 0;
+            }
 
-            if (key == 42 || key == 54) { // Shift 
-                shift_pressed = 0;
+            if (key == 42 || key == 54) {
+                local_shift_pressed = 0;
             }
             continue;
         }
 
-        if (sc == 42 || sc == 54) { // Shift 
-            shift_pressed = 1;
-            key_down[sc] = 1;
+        if (sc == 42 || sc == 54) {
+            local_shift_pressed = 1;
+            local_key_down[sc] = 1;
             continue;
         }
 
-        if (key_down[sc]) continue;
-        key_down[sc] = 1;
+        if (sc < 128 && local_key_down[sc]) {
+            continue;
+        }
+        if (sc < 128) {
+            local_key_down[sc] = 1;
+        }
 
-        if (sc == 60) { // F2
-            fs_write(name, ext, buffer);
-            print("\nFile saved\n");
+        if (sc == 60) {
+            if (fs_write(name, ext, buffer) == 0) {
+                status_message = "File saved";
+            } else {
+                status_message = "Save failed";
+            }
+            editor_render(name, ext, buffer, len, cursor, status_message);
             continue;
         }
 
-        if (sc == 1) { // ESC
+        if (sc == 1) {
             break;
         }
 
-        char c = shift_pressed ? scancode_shift_map[sc] : scancode_map[sc];
-        if (!c) continue;
-
         if (sc == 28) {
-            if (pos < 510) {
-                buffer[pos++] = '\n';
-                buffer[pos] = '\0';
-                print("\n");
+            if (editor_insert_char(buffer, &len, &cursor, '\n')) {
+                status_message = "";
+            } else {
+                status_message = "Buffer full";
             }
+            editor_render(name, ext, buffer, len, cursor, status_message);
             continue;
         }
 
-        if (c == '\b') {
-            if (pos > 0) {
-                pos--;
-                buffer[pos] = '\0';
-                put_char('\b');
-            }
-            continue;
-        }
+        {
+            char c = local_shift_pressed ? scancode_shift_map[sc] : scancode_map[sc];
 
-        if (c >= 32 && c <= 126) {
-            if (pos < 511) {
-                buffer[pos++] = c;
-                buffer[pos] = '\0';
-                put_char(c);
+            if (!c) {
+                continue;
+            }
+
+            if (c == '\b') {
+                editor_delete_char(buffer, &len, &cursor);
+                status_message = "";
+                editor_render(name, ext, buffer, len, cursor, status_message);
+                continue;
+            }
+
+            if (c == '\t') {
+                int inserted = 0;
+
+                while (inserted < 4 && editor_insert_char(buffer, &len, &cursor, ' ')) {
+                    inserted++;
+                }
+
+                status_message = (inserted == 4) ? "" : "Buffer full";
+                editor_render(name, ext, buffer, len, cursor, status_message);
+                continue;
+            }
+
+            if (c >= 32 && c <= 126) {
+                if (editor_insert_char(buffer, &len, &cursor, c)) {
+                    status_message = "";
+                } else {
+                    status_message = "Buffer full";
+                }
+                editor_render(name, ext, buffer, len, cursor, status_message);
             }
         }
     }
 
+    reset_keyboard_state();
     print("\nExited editor\n");
 }
