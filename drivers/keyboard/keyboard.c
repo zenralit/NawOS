@@ -533,12 +533,115 @@ void uint8_to_hex(uint8_t val, char* out) {
 }
 
 int atoi(const char* str) {
+    int sign = 1;
     int res = 0;
+    while (*str == ' ') {
+        str++;
+    }
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    } else if (*str == '+') {
+        str++;
+    }
     while (*str >= '0' && *str <= '9') {
         res = res * 10 + (*str - '0');
         str++;
     }
-  return res;
+  return sign * res;
+}
+
+int keyboard_read_int() {
+    char buffer[32];
+    int pos = 0;
+    uint8_t local_key_down[128] = {0};
+    int local_shift_pressed = 0;
+
+    reset_keyboard_state();
+
+    buffer[0] = 0;
+
+    while (1) {
+        uint16_t full_sc = get_scancode();
+        uint8_t sc;
+        char c;
+
+        if (full_sc == 0) {
+            asm volatile("pause");
+            continue;
+        }
+
+        if (full_sc > 0xFF) {
+            continue;
+        }
+
+        sc = full_sc & 0xFF;
+
+        if (sc & 0x80) {
+            uint8_t key = sc & 0x7F;
+
+            if (key < 128) {
+                local_key_down[key] = 0;
+            }
+
+            if (key == 42 || key == 54) {
+                local_shift_pressed = 0;
+            }
+            continue;
+        }
+
+        if (sc == 42 || sc == 54) {
+            local_shift_pressed = 1;
+            if (sc < 128) {
+                local_key_down[sc] = 1;
+            }
+            continue;
+        }
+
+        if (sc < 128 && local_key_down[sc]) {
+            continue;
+        }
+        if (sc < 128) {
+            local_key_down[sc] = 1;
+        }
+
+        if (sc == 28) {
+            print("\n");
+            break;
+        }
+
+        c = local_shift_pressed ? scancode_shift_map[sc] : scancode_map[sc];
+        if (!c) {
+            continue;
+        }
+
+        if (c == '\b') {
+            if (pos > 0) {
+                pos--;
+                buffer[pos] = 0;
+                print_backspace();
+            }
+            continue;
+        }
+
+        if (((c >= '0' && c <= '9') || c == '-' || c == '+') &&
+            pos < (int)sizeof(buffer) - 1) {
+            if ((c == '-' || c == '+') && pos != 0) {
+                continue;
+            }
+
+            buffer[pos++] = c;
+            buffer[pos] = 0;
+
+            {
+                char str[2] = {c, 0};
+                print(str);
+            }
+        }
+    }
+
+    reset_keyboard_state();
+    return atoi(buffer);
 }
 
 void keyboard_handle_interrupt() {  
