@@ -3,12 +3,20 @@
 
 #include <stdint.h>
 
+#define SCREEN_ROWS 25
+#define SCREEN_COLS 80
+
 extern int cursor_x;
 extern int cursor_y;
 extern uint16_t cursor_offset;
 
 void move_cursor_left();
 void move_cursor_right();
+void screen_set_cursor_absolute(int row, int col);
+void screen_begin_batch();
+void screen_end_batch();
+void screen_scroll_page_up();
+void screen_scroll_page_down();
 void update_cursor();
 void clear_screen();
 void put_char(char c);
@@ -24,4 +32,3 @@ void print_ip();
 void print_tab();
 
 #endif
-
