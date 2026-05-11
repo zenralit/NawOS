@@ -14,6 +14,7 @@ void keyboard_handle_interrupt();
 int fs_read_to_buffer(const char* name, const char* ext, char* buffer, int max_len);
 void start_text_editor(const char* name, const char* ext);
 int atoi(const char* str);
+int keyboard_read_int();
 char* strstr(const char* haystack, const char* needle);
 char* find_char(const char* str, char ch);
 void* memcpy(void* dest, const void* src, size_t n);

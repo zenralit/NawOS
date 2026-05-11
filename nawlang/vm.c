@@ -1,5 +1,6 @@
 #include "vm.h"
 #include "drivers/screen/screen.h"
+#include "drivers/keyboard/keyboard.h"
 
 typedef struct {
     int return_ip;
@@ -20,6 +21,11 @@ static int pop() { return stack[--sp]; }
 
 void vm_run(Instruction* code) {
     int ip = 0;
+
+    sp = 0;
+    for (int i = 0; i < MAX_VARS; i++) {
+        vars[i] = 0;
+    }
 
     for (;;) {
         Instruction in = code[ip++];
@@ -55,6 +61,10 @@ void vm_run(Instruction* code) {
             case OP_PRINT_STR:
                 print((char*)pop());
                 print("\n");
+                break;
+
+            case OP_READ_INT:
+                vars[in.arg] = keyboard_read_int();
                 break;
 
             case OP_PUSH_STR:

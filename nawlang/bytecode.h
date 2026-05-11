@@ -9,6 +9,7 @@ typedef enum {
     OP_PUSH_STR,
     OP_PRINT_INT,
     OP_PRINT_STR,
+    OP_READ_INT,
     OP_LOAD_VAR,
     OP_STORE_VAR,
 
