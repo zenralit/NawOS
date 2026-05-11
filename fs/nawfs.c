@@ -1,17 +1,12 @@
 #include "nawfs.h"
-#include "drivers/disk/disk.h"
+#include "drivers/ata/ata.h"
 #include "drivers/screen/screen.h"
+#include "kernel/memory/memory.h"
+#include "lib/nawstring.h"
 #include <stddef.h>
 
 nawfs_entry entries[MAX_FILES];
 int file_count = 0;
-
-void* memset(void* dest, int val, size_t n);
-void* memcpy(void* dest, const void* src, size_t n);
-int memcmp(const void* s1, const void* s2, size_t n);
-char* strncpy(char* dest, const char* src, unsigned int n);
-unsigned int strlen(const char* s);
-void itoa(int value, char* str);
 
 static const char nawfs_magic[NAWFS_MAGIC_LEN] = {'N', 'A', 'W', 'F', 'S', '1', 0, 0};
 
@@ -378,58 +373,4 @@ void fs_list() {
         print(size);
         print(" bytes)\n");
     }
-}
-
-//  функции 
-
-
-
-void* memset(void* dest, int val, size_t n) {
-    unsigned char* d = dest;
-    while (n--) *d++ = (unsigned char)val;
-    return dest;
-}
-
-
-char* strncpy(char* dest, const char* src, unsigned int n) {
-    unsigned int i = 0;
-    for (; i < n && src[i]; i++) dest[i] = src[i];
-    for (; i < n; i++) dest[i] = 0;
-    return dest;
-}
-
-unsigned int strlen(const char* s) {
-    unsigned int len = 0;
-    while (*s++) len++;
-    return len;
-}
-
-void itoa(int value, char* str) {
-    char* p = str;
-    char buf[10];
-    int i = 0;
-    if (value == 0) {
-        *p++ = '0';
-        *p = 0;
-        return;
-    }
-
-    while (value > 0) {
-        buf[i++] = '0' + (value % 10);
-        value /= 10;
-    }
-
-    while (i > 0) *p++ = buf[--i];
-        *p = 0;
-}
-
-int memcmp(const void* s1, const void* s2, size_t n) {
-    const unsigned char* p1 = s1;
-    const unsigned char* p2 = s2;
-    for (size_t i = 0; i < n; i++) {
-        if (p1[i] != p2[i]) {
-            return p1[i] - p2[i];
-        }
-    }
-    return 0;
 }

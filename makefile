@@ -15,26 +15,47 @@ VBOX_DISK_IMAGE = nawos.vdi
 
 OBJS = \
 boot/kernel_entry.o \
-kernel/irq/irq0.o \
-kernel/irq/irq1.o \
-kernel/irq/irq11.o \
-kernel/idt_load.o \
-kernel/idt.o \
+kernel/interrupts/irq0.o \
+kernel/interrupts/irq1.o \
+kernel/interrupts/irq11.o \
+kernel/interrupts/idt_load.o \
+kernel/interrupts/idt.o \
 kernel/kernel.o \
+kernel/memory/memory.o \
+kernel/input/keyboard_driver.o \
+kernel/input/input.o \
+kernel/shell/shell.o \
+kernel/shell/shell_input.o \
+kernel/shell/shell_parser.o \
+kernel/shell/shell_commands.o \
+kernel/terminal/terminal.o \
+apps/editor/editor.o \
+apps/editor/editor_buffer.o \
+apps/editor/editor_cursor.o \
+apps/editor/editor_render.o \
+apps/editor/editor_file.o \
+apps/editor/editor_input.o \
+apps/calc/calc.o \
+drivers/vga/vga.o \
 drivers/screen/screen.o \
 drivers/keyboard/keyboard.o \
 drivers/ports/ports.o \
-drivers/disk/disk.o \
-drivers/net/pci.o \
-drivers/net/rtl8139.o \
-drivers/net/net.o \
-drivers/net/ip.o \
-drivers/net/dhcp.o \
+drivers/ata/ata.o \
+drivers/pci/pci.o \
+drivers/rtl8139/rtl8139.o \
 fs/nawfs.o \
 lib/math.o \
-nawlang/parser.o \
-nawlang/vm.o \
-nawlang/compiler.o 
+lib/nawstring.o \
+lib/nawutil.o \
+net/net.o \
+net/ip.o \
+net/dhcp.o \
+net/ethernet.o \
+net/ipv4.o \
+net/udp.o \
+apps/nawlang/parser.o \
+apps/nawlang/vm.o \
+apps/nawlang/compiler.o 
 
 .PHONY: all iso vbox run run-iso clean
 
@@ -43,10 +64,10 @@ all: os-image.bin
 boot/%.o: boot/%.asm
 	$(AS) -f elf32 $< -o $@
 
-kernel/irq/%.o: kernel/irq/%.asm
+kernel/interrupts/%.o: kernel/interrupts/%.asm
 	$(AS) -f elf32 $< -o $@
 
-kernel/idt_load.o: kernel/idt_load.asm
+kernel/interrupts/idt_load.o: kernel/interrupts/idt_load.asm
 	$(AS) -f elf32 $< -o $@
 
 boot/bootloader.bin: boot/bootloader.asm
@@ -122,9 +143,9 @@ run-iso: $(ISO_IMAGE)
 
 clean:
 	rm -f \
-	boot/*.o kernel/*.o kernel/irq/*.o \
+	boot/*.o kernel/*.o kernel/*/*.o kernel/*/*/*.o \
 	drivers/*/*.o drivers/*/*/*.o \
-	fs/*.o lib/*.o nawlang/*.o \
+	fs/*.o lib/*.o nawlang/*.o apps/*/*.o net/*.o \
 	boot/bootloader_iso.bin \
 	kernel.raw \
 	*.bin \

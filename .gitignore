@@ -4,3 +4,4 @@ boot/bootloader_iso.bin
 build/iso-root/
 nawos.iso
 nawos.vdi
+nowstructure.txt
