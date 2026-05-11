@@ -1,20 +1,20 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "drivers/screen/screen.h"
-#include "idt.h"
+#include "kernel/interrupts/idt.h"
 #include "drivers/keyboard/keyboard.h"
 #include "drivers/ports/ports.h"
 #include "fs/nawfs.h"
 #include "lib/nawstring.h"
-#include "drivers/disk/disk.h"
-#include "drivers/net/net.h"
-#include "drivers/net/rtl8139.h" 
+#include "drivers/ata/ata.h"
+#include "net/net.h"
+#include "drivers/rtl8139/rtl8139.h" 
 
 void dummy_timer_callback() {}
     
 void kernel_main() {
     clear_screen();
-    print("Welcome in NawOS. \n");
+    print("Welcome in Sarma. \n");
     print("print command >>>>\n");
     idt_init();
     keyboard_init();
@@ -22,15 +22,7 @@ void kernel_main() {
     rtl8139_init();
     asm volatile("sti");
     net_init();
-   
-//1.1 что такое ОС. состав ОС
-//1.2 какие ОС существуют
-//2.1 проектирование / анализ
-//2.2 выбор технологий, стек, среда
-//2.3 описание nawOS, технологии разработки 
-//3.1 разработка ядра
-//3.2 модуль фс
-//3.3 тестирование
+
 
     while (1) {
         rtl8139_poll();

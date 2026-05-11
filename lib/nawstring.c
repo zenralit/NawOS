@@ -20,6 +20,20 @@ int strcmp(const char* s1, const char* s2) {
     return *(unsigned char*)s1 - *(unsigned char*)s2;
 }
 
+int strncmp(const char* s1, const char* s2, unsigned int n) {
+    for (unsigned int i = 0; i < n; i++) {
+        if (s1[i] != s2[i]) {
+            return (unsigned char)s1[i] - (unsigned char)s2[i];
+        }
+
+        if (s1[i] == '\0') {
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
 unsigned int strlen(const char* str) {
     unsigned int len = 0;
     while (str[len]) len++;

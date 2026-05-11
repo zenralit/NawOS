@@ -1,0 +1,10 @@
+#ifndef KERNEL_MEMORY_MEMORY_H
+#define KERNEL_MEMORY_MEMORY_H
+
+#include <stddef.h>
+
+void* memcpy(void* dest, const void* src, size_t n);
+void* memset(void* dest, int val, size_t n);
+int memcmp(const void* s1, const void* s2, size_t n);
+
+#endif

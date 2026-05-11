@@ -2,9 +2,10 @@
 #define SCREEN_H
 
 #include <stdint.h>
+#include "drivers/vga/vga.h"
 
-#define SCREEN_ROWS 25
-#define SCREEN_COLS 80
+#define SCREEN_ROWS VGA_ROWS
+#define SCREEN_COLS VGA_COLS
 
 extern int cursor_x;
 extern int cursor_y;
