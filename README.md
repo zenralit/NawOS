@@ -1,61 +1,159 @@
-<body>
+# NawOS
 
-  <h1>NawOS</h1>
+<p align="center">
+  <img src="img/main.png" width="900">
+</p>
 
-  <p>
-    NawOS is a hobby operating system for x86 written in C and Assembly.
-    The project started as a small educational kernel and gradually evolved into a modular monolithic operating system with its own shell, filesystem, networking stack, text editor, and bytecode virtual machine.
-  </p>
+<p align="center">
+  <strong>A hobby x86 operating system written entirely from scratch in C and NASM Assembly.</strong>
+  <br><br>
+  Custom Bootloader • Protected Mode • Own Filesystem • Shell • Text Editor • Networking • Virtual Machine
+</p>
 
-  <p>
-    The system runs in 32-bit protected mode and is designed to work inside QEMU.
-  </p>
+<p align="center">
 
-  <hr>
+![Language](https://img.shields.io/badge/language-C%20%2B%20NASM-blue)
+![Architecture](https://img.shields.io/badge/x86-32--bit-success)
+![Boot](https://img.shields.io/badge/boot-BIOS-orange)
+![Platform](https://img.shields.io/badge/platform-QEMU-lightgrey)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
-  <h1>Features</h1>
+</p>
 
-  <h2>Boot and Kernel</h2>
+---
 
-  <ul>
-    <li>Custom x86 bootloader</li>
-    <li>Transition from Real Mode to 32-bit Protected Mode</li>
-    <li>GDT and IDT setup</li>
-    <li>IRQ and interrupt handling</li>
-    <li>VGA text mode terminal</li>
-    <li>PS/2 keyboard driver</li>
-    <li>Modular kernel architecture</li>
-  </ul>
+# About
 
-  <hr>
+NawOS is a hobby operating system developed entirely from scratch for the **x86 architecture**.
 
-  <h2>Filesystem — NawFS</h2>
+The project began as a simple educational kernel and gradually evolved into a modular monolithic operating system featuring its own bootloader, filesystem, shell, networking stack, text editor, and stack-based bytecode virtual machine.
 
-  <p>
-    NawOS uses its own custom filesystem called <strong>NawFS</strong>.
-  </p>
+The primary goal of the project is to explore operating system internals, low-level programming, and computer architecture without relying on existing kernels or external libraries.
 
-  <p>Features:</p>
+---
 
-  <ul>
-    <li>Persistent storage</li>
-    <li>File creation and deletion</li>
-    <li>File reading and writing</li>
-    <li>Automatic filesystem formatting on first boot</li>
-    <li>Simple sector-based file allocation</li>
-  </ul>
+# Project at a Glance
 
-  <hr>
 
-  <h2>Shell</h2>
+-  Written entirely in **C** and **NASM Assembly**
+-  Custom BIOS bootloader
+-  Own filesystem (**NawFS**)
+-  Interactive shell
+-  Built-in text editor
+-  RTL8139 network driver
+-  Ethernet / IPv4 / UDP / DHCP
+-  Stack-based bytecode virtual machine
 
-  <p>
-    Built-in shell with command parsing and dispatch system.
-  </p>
 
-  <p>Example commands:</p>
+---
 
-  <pre><code>help
+# Screenshots
+
+## Shell
+
+<p align="center">
+<img src="img/shell.png" width="850">
+</p>
+
+---
+
+## Text Editor
+
+<p align="center">
+<img src="img/edit.png" width="850">
+</p>
+
+---
+
+## NawFS
+
+<p align="center">
+<img src="img/filesystem.png" width="850">
+</p>
+
+---
+
+
+---
+
+# Architecture
+
+```
+                BIOS
+                 │
+                 ▼
+          Custom Bootloader
+                 │
+                 ▼
+      32-bit Protected Mode
+                 │
+                 ▼
+              Kernel
+                 │
+    ┌────────────┼────────────┐
+    │            │            │
+ Drivers      NawFS        Memory
+    │
+    ├── Keyboard
+    ├── ATA
+    └── RTL8139
+                 │
+                 ▼
+               Shell
+                 │
+     ┌───────────┼────────────┐
+     │           │            │
+  Editor      NawLang      Network
+```
+
+---
+
+# Features
+
+## Bootloader
+
+- Custom BIOS bootloader
+- Real Mode → Protected Mode transition
+- GDT initialization
+- IDT initialization
+- Kernel loading
+
+---
+
+## Kernel
+
+- Modular kernel architecture
+- Interrupt handling
+- IRQ support
+- VGA text mode terminal
+- PS/2 keyboard driver
+
+---
+
+## Filesystem — NawFS
+
+NawOS uses its own filesystem implementation called **NawFS**.
+
+Features include:
+
+- Persistent storage
+- File creation
+- File deletion
+- File reading
+- File writing
+- Automatic formatting on first boot
+- Sector-based allocation
+
+---
+
+## Shell
+
+The operating system includes a built-in command interpreter with command parsing and dispatch.
+
+Example commands:
+
+```text
+help
 ls
 cat
 edit
@@ -65,176 +163,179 @@ ipconfig
 dhcp
 run
 clear
-reboot</code></pre>
+reboot
+```
 
-  <hr>
+---
 
-  <h2>Text Editor</h2>
+## Text Editor
 
-  <p>
-    Integrated terminal text editor with Vim-inspired controls.
-  </p>
+Integrated terminal text editor inspired by Vim.
 
-  <p>Features:</p>
+Features:
 
-  <ul>
-    <li>Cursor movement</li>
-    <li>Text insertion and deletion</li>
-    <li>File saving/loading</li>
-    <li>Multi-line editing</li>
-    <li>Scroll support</li>
-  </ul>
+- Cursor movement
+- Multi-line editing
+- Insert/Delete operations
+- File loading
+- File saving
+- Scrolling
 
-  <hr>
+---
 
-  <h2>Networking</h2>
+## Networking
 
-  <p>
-    Basic network stack implementation with:
-  </p>
+Networking subsystem includes:
 
-  <ul>
-    <li>PCI device scanning</li>
-    <li>RTL8139 network driver</li>
-    <li>Ethernet frame handling</li>
-    <li>IPv4 support</li>
-    <li>UDP packets</li>
-    <li>DHCP client</li>
-  </ul>
+- PCI device enumeration
+- RTL8139 Ethernet driver
+- Ethernet frame processing
+- IPv4
+- UDP
+- DHCP client
 
-  <p>
-    Networking is designed primarily for educational and experimental purposes.
-  </p>
+Designed primarily for educational purposes.
 
-  <hr>
+---
 
-  <h2>Lelya VM</h2>
+## Lelya Virtual Machine
 
-  <p>
-    NawOS includes a simple stack-based bytecode virtual machine.
-  </p>
+Stack-based bytecode virtual machine.
 
-  <p>Features:</p>
+Supports:
 
-  <ul>
-    <li>Integer operations</li>
-    <li>Stack instructions</li>
-    <li>Arithmetic execution</li>
-    <li>Basic interpreter architecture</li>
-  </ul>
+- Integer arithmetic
+- Stack operations
+- Bytecode execution
+- Simple interpreter architecture
 
-  <hr>
+---
 
-  <h1>Project Structure</h1>
+# Skills Demonstrated
 
-  <pre><code>boot/               Bootloader and protected mode transition
-kernel/             Core kernel systems
+- Operating system development
+- Bootloader development
+- x86 Protected Mode
+- GDT / IDT initialization
+- Interrupt and IRQ handling
+- Device driver development
+- ATA PIO programming
+- Filesystem design
+- PCI enumeration
+- Ethernet networking
+- IPv4
+- UDP
+- DHCP
+- Command interpreter implementation
+- Virtual machine implementation
+- Low-level systems programming
+- C programming
+- NASM Assembly
+
+---
+
+# Implemented Components
+
+| Component | Status |
+|-----------|:------:|
+| Bootloader | + |
+| Protected Mode | + |
+| GDT | + |
+| IDT | + |
+| IRQ Handling | + |
+| VGA Terminal | + |
+| Keyboard Driver | + |
+| ATA Driver | + |
+| NawFS | + |
+| Shell | + |
+| Text Editor | + |
+| RTL8139 Driver | +- |
+| Ethernet | - |
+| IPv4 | +- |
+| UDP | +- |
+| DHCP Client | +- |
+| Lelya VM | + |
+
+---
+
+# Project Structure
+
+```text
+boot/               Bootloader
+kernel/             Core kernel
 drivers/            Hardware drivers
-fs/                 NawFS filesystem
-net/                Network stack
+fs/                 NawFS
+net/                Networking stack
 apps/               Built-in applications
 apps/editor/        Text editor
-apps/nawlang/       Virtual machine and language runtime</code></pre>
+apps/nawlang/       Virtual machine
+```
 
-  <hr>
+---
 
-  <h1>Requirements</h1>
+# Requirements
 
-  <p>The following tools are required:</p>
+- GCC
+- NASM
+- GNU Make
+- LD
+- QEMU (qemu-system-i386)
 
-  <ul>
-    <li>gcc</li>
-    <li>make</li>
-    <li>nasm</li>
-    <li>ld</li>
-    <li>qemu-system-i386</li>
-  </ul>
+---
 
-  <hr>
+# Build
 
-  <h1>Installation</h1>
+```bash
+make clean
+make
+```
 
-  <h2>Ubuntu / Debian</h2>
+---
 
-  <pre><code>sudo apt update
-sudo apt install build-essential nasm qemu-system-x86 make</code></pre>
+# Run
 
-  <hr>
+```bash
+make run
+```
 
-  <h2>Arch Linux</h2>
+---
 
-  <pre><code>sudo pacman -S base-devel nasm qemu</code></pre>
+# Running with Persistent Storage
 
-  <hr>
-
-  <h2>Windows</h2>
-
-  <p>It is recommended to use:</p>
-
-  <ul>
-    <li>WSL2</li>
-    <li>MSYS2</li>
-  </ul>
-
-  <p>
-    WSL2 with Ubuntu is the preferred environment.
-  </p>
-
-  <hr>
-
-  <h1>Build</h1>
-
-  <pre><code>make clean
-make</code></pre>
-
-  <hr>
-
-  <h1>Run</h1>
-
-  <pre><code>make run</code></pre>
-
-  <hr>
-
-  <h1>Running with Persistent Filesystem</h1>
-
-  <p>
-    NawOS can use a separate filesystem image:
-  </p>
-
-  <pre><code>qemu-system-i386 \
+```bash
+qemu-system-i386 \
 -drive file=os-image.bin,format=raw,index=0,if=floppy \
 -drive file=nawfs.img,format=raw,index=1,if=ide \
 -net nic,model=rtl8139 \
--net user</code></pre>
+-net user
+```
 
-  <hr>
+---
 
-  <h1>Technical Details</h1>
+# Technical Details
 
-  <ul>
-    <li><strong>Architecture:</strong> x86 (32-bit)</li>
-    <li><strong>Language:</strong> C + NASM Assembly</li>
-    <li><strong>Boot mode:</strong> BIOS</li>
-    <li><strong>Execution mode:</strong> Protected Mode</li>
-    <li><strong>Memory model:</strong> Flat memory model</li>
-    <li><strong>Filesystem:</strong> NawFS</li>
-    <li><strong>Network card:</strong> RTL8139</li>
-  </ul>
+| Property | Value |
+|----------|-------|
+| Architecture | x86 (32-bit) |
+| Language | C + NASM Assembly |
+| Boot Mode | BIOS |
+| Execution Mode | Protected Mode |
+| Filesystem | NawFS |
+| Network Driver | RTL8139 |
+| Virtual Machine | Lelya VM |
 
-  <hr>
+---
 
-  <h1>Goals</h1>
+# Design Goals
 
+- Learn operating system internals through practical implementation.
+- Implement every subsystem from scratch whenever feasible.
+- Minimize external dependencies.
+- Keep the architecture modular.
+- Explore low-level systems programming concepts.
 
-  <p>
-    The project is intentionally written without external libraries or existing kernels.
-  </p>
+---
 
+# License
 
-  <hr>
-
-  <h1>License</h1>
-
-  <p> GPL-3.0 license</p>
-
-</body>
+Licensed under the **GPL-3.0 License**.
