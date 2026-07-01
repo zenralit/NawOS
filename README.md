@@ -235,6 +235,6 @@ make</code></pre>
 
   <h1>License</h1>
 
-  <p>MIT License</p>
+  <p> GPL-3.0 license</p>
 
 </body>
