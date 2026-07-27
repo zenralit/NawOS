@@ -103,7 +103,7 @@ The primary goal of the project is to explore operating system internals, low-le
                  │
      ┌───────────┼────────────┐
      │           │            │
-  Editor      NawLang      Network
+  Editor      Lelya        Network
 ```
 
 ---
