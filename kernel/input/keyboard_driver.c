@@ -29,6 +29,7 @@ static keyboard_event_handler_t keyboard_event_handler = 0;
 void keyboard_driver_init() {
     uint8_t mask = inb(0x21);
 
+    /* Размаскируем IRQ1 (клавиатура) на master PIC. */
     outb(0x21, mask & ~0x02);
 }
 
@@ -54,6 +55,7 @@ uint16_t keyboard_driver_read_scancode() {
     {
         uint8_t scancode = inb(PORT_KBD_DATA);
 
+        /* Префикс 0xE0: следующий байт — расширенная клавиша (стрелки и т.д.). */
         if (scancode == EXTENDED_SCANCODE_PREFIX) {
             while ((inb(0x64) & 0x01) == 0) {
             }
@@ -113,6 +115,7 @@ int keyboard_driver_translate_scancode(uint16_t scancode, keyboard_event_t* even
         return 0;
     }
 
+    /* Подавление автоповтора: игнорируем повторное нажатие, пока клавиша не отпущена. */
     if (key_down[scancode]) {
         return 0;
     }

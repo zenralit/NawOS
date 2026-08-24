@@ -22,9 +22,29 @@ static void shell_print_ipv4(const uint8_t ip[4]) {
     }
 }
 
+static const char* shell_skip_spaces(const char* input) {
+    while (input && (*input == ' ' || *input == '\t')) {
+        input++;
+    }
+
+    return input;
+}
+
+static int shell_command_matches(const char* input, const char* command) {
+    unsigned int len = strlen(command);
+
+    /* Совпадение целого имени команды: "calc" не матчит "calculator". */
+    if (strncmp(input, command, len) != 0) {
+        return 0;
+    }
+
+    return input[len] == '\0' || input[len] == ' ' || input[len] == '\t';
+}
+
 static void shell_reboot_system() {
     uint8_t good = 0x02;
 
+    /* Pulse reset через контроллер клавиатуры (8042), классический PC-трюк. */
     while (good & 0x02) {
         good = inb(0x64);
     }
@@ -87,7 +107,7 @@ static void shell_print_help() {
     terminal_write("rm <name.ext> - Delete file\n");
     terminal_write("readsec <num> - Read disk sector\n");
     terminal_write("edit <name.ext> - text editor\n");
-    terminal_write("calc <math exp> - solve a mathematical expression\n");
+    terminal_write("calc - complex math tools\n");
     terminal_write("dhcp - Request a DHCP lease\n");
     terminal_write("ipconfig - Show network configuration\n");
     terminal_write("netmsg <text> - Broadcast UDP text\n");
@@ -197,8 +217,8 @@ void shell_execute_command(const char* input) {
         } else {
             editor_start(name, ext);
         }
-    } else if (strncmp(input, "calc", 4) == 0) {
-        calc_run_expression(input + 4);
+    } else if (shell_command_matches(input, "calc")) {
+        calc_run_expression(shell_skip_spaces(input + 4));
     } else if (strncmp(input, "lelya", 5) == 0) {
         shell_dump_scancodes();
     } else if (strcmp(input, "dhcp") == 0) {

@@ -20,10 +20,14 @@ void kernel_main() {
     keyboard_init();
     fs_init();
     rtl8139_init();
+    /* Прерывания включаем до сети: IRQ клавиатуры и RTL8139 уже замаплены в IDT. */
     asm volatile("sti");
     net_init();
 
-
+    /*
+     * Нет отдельного потока сетевого стека: приём и DHCP-ретраи крутятся
+     * в главном цикле вместе с опросом RTL8139.
+     */
     while (1) {
         rtl8139_poll();
         rtl8139_handle_receive();

@@ -5,6 +5,7 @@ static const uint8_t terminal_attribute = VGA_DEFAULT_ATTRIBUTE;
 
 #define MAX_ROWS TERMINAL_ROWS
 #define MAX_COLS TERMINAL_COLS
+/* История строк шире экрана: прокрутка Page Up/Down без потери вывода shell. */
 #define SCROLLBACK_ROWS 96
 
 int terminal_cursor_x = 0;
@@ -227,6 +228,7 @@ void terminal_end_batch() {
     }
 
     render_batch_depth--;
+    /* Отложенный render_view: редактор пишет много символов за один кадр. */
     if (render_batch_depth == 0 && render_pending) {
         render_pending = 0;
         render_view();
@@ -332,15 +334,31 @@ void terminal_update_cursor() {
 }
 
 void terminal_write_double(double value) {
-    int int_part = (int)value;
-    int frac_part = (int)((value - int_part) * 10000);
+    int negative = 0;
+    int int_part;
+    int frac_part;
+
+    if (value < 0.0) {
+        negative = 1;
+        value = -value;
+    }
+
+    /* 4 знака после точки; округление вверх может дать frac_part == 10000. */
+    int_part = (int)value;
+    value -= (double)int_part;
+    frac_part = (int)(value * 10000.0 + 0.5);
+
+    if (frac_part >= 10000) {
+        int_part++;
+        frac_part -= 10000;
+    }
+
+    if (negative) {
+        terminal_put_char('-');
+    }
 
     terminal_write_int(int_part);
     terminal_write(".");
-
-    if (frac_part < 0) {
-        frac_part = -frac_part;
-    }
 
     if (frac_part < 1000) {
         terminal_write("0");

@@ -1,3 +1,4 @@
+/* memcpy/memset/memcmp — freestanding-замена libc для драйверов и сети. */
 #include "kernel/memory/memory.h"
 
 void* memcpy(void* dest, const void* src, size_t n) {

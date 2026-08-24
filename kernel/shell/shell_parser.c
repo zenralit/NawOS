@@ -11,6 +11,7 @@ int shell_parse_filename(const char* filename, char* name, char* ext) {
         return 0;
     }
 
+    /* Имена NawFS: до 8 символов имени и 3 расширения (как в каталоге на диске). */
     name_len = (size_t)(dot - filename);
     if (name_len > 8) {
         name_len = 8;

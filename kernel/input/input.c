@@ -13,6 +13,7 @@ void input_init() {
 }
 
 void input_set_handler(keyboard_event_handler_t handler) {
+    /* Редактор подменяет обработчик; shell восстанавливается через input_init. */
     active_handler = handler;
 }
 
@@ -21,6 +22,7 @@ void input_handle_keyboard_event(const keyboard_event_t* event) {
         return;
     }
 
+    /* Page Up/Down на расширенных scancode — прокрутка терминала, не shell. */
     if (event->extended) {
         if ((event->scancode & 0xFF) == KEYBOARD_EXTENDED_KEY_UP) {
             terminal_scroll_page_up();
@@ -46,6 +48,7 @@ int input_read_int() {
     keyboard_driver_reset_state();
     buffer[0] = 0;
 
+    /* Блокирующий ввод числа для read в Lelya; scancode 28 — Enter. */
     while (1) {
         if (!keyboard_driver_poll_event(&event)) {
             asm volatile("pause");

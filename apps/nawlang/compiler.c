@@ -1,12 +1,14 @@
 #include "compiler.h"
 #include "vm.h"
+#include "lib/math.h"
 
 #include "lib/nawstring.h"
 
 #define MAX_STRINGS 64
-#define MAX_STRING_LEN 64
+#define MAX_STRING_LEN 128
 #define MAX_VAR_NAME_LEN 16
 #define MAX_LOOP_DEPTH 8
+#define MAX_NATIVE_ARGS 3
 
 typedef struct {
     int loop_start;
@@ -35,6 +37,9 @@ static const char* skip_whitespace(const char* src);
 static const char* skip_to_line_end(const char* src);
 static int read_identifier(const char** src, char* name);
 static char* add_string(const char* s);
+static int native_math_id_from_name(const char* name);
+static int capture_native_math_argument(const char** src, char* out, int out_size);
+static int compile_native_math_call(const char* name, const char** src, Instruction* code, int* ip);
 static void parse_factor(Instruction* code, int* ip);
 static void parse_term(Instruction* code, int* ip);
 static void parse_expr(Instruction* code, int* ip);
@@ -143,6 +148,176 @@ static char* add_string(const char* s) {
     return string_pool[string_count++];
 }
 
+static int native_math_id_from_name(const char* name) {
+    if (strcmp(name, "math_eval") == 0) return NAW_MATH_NATIVE_EVAL;
+    if (strcmp(name, "math_add") == 0) return NAW_MATH_NATIVE_ADD;
+    if (strcmp(name, "math_sub") == 0) return NAW_MATH_NATIVE_SUB;
+    if (strcmp(name, "math_mul") == 0) return NAW_MATH_NATIVE_MUL;
+    if (strcmp(name, "math_div") == 0) return NAW_MATH_NATIVE_DIV;
+    if (strcmp(name, "math_pow") == 0) return NAW_MATH_NATIVE_POW;
+    if (strcmp(name, "math_sqrt") == 0) return NAW_MATH_NATIVE_SQRT;
+    if (strcmp(name, "math_sin") == 0) return NAW_MATH_NATIVE_SIN;
+    if (strcmp(name, "math_cos") == 0) return NAW_MATH_NATIVE_COS;
+    if (strcmp(name, "math_tan") == 0) return NAW_MATH_NATIVE_TAN;
+    if (strcmp(name, "math_abs") == 0) return NAW_MATH_NATIVE_ABS;
+    if (strcmp(name, "math_arg") == 0) return NAW_MATH_NATIVE_ARG;
+    if (strcmp(name, "math_conj") == 0) return NAW_MATH_NATIVE_CONJ;
+    if (strcmp(name, "math_norm") == 0) return NAW_MATH_NATIVE_NORM;
+    if (strcmp(name, "math_quad") == 0) return NAW_MATH_NATIVE_QUAD;
+
+    return -1;
+}
+
+static int capture_native_math_argument(const char** src, char* out, int out_size) {
+    const char* cur = skip_inline_space(*src);
+    int depth = 0;
+    int in_string = 0;
+    int pos = 0;
+    int started = 0;
+
+    if (*cur == '\0' || *cur == ')') {
+        return 0;
+    }
+
+    /*
+     * Аргумент math_* не компилируется как expr Lelya, а сохраняется текстом
+     * для naw_eval_complex_expr. Запятые внутри скобок/строк не разделяют args.
+     */
+    while (*cur) {
+        char c = *cur;
+
+        if (in_string) {
+            if (c == '"') {
+                in_string = 0;
+            }
+
+            if (pos < out_size - 1) {
+                out[pos++] = c;
+            }
+            cur++;
+            started = 1;
+            continue;
+        }
+
+        if (c == '"') {
+            in_string = 1;
+            if (pos < out_size - 1) {
+                out[pos++] = c;
+            }
+            cur++;
+            started = 1;
+            continue;
+        }
+
+        if (c == '(') {
+            depth++;
+            if (pos < out_size - 1) {
+                out[pos++] = c;
+            }
+            cur++;
+            started = 1;
+            continue;
+        }
+
+        if (c == ')') {
+            if (depth == 0) {
+                break;
+            }
+
+            depth--;
+            if (pos < out_size - 1) {
+                out[pos++] = c;
+            }
+            cur++;
+            started = 1;
+            continue;
+        }
+
+        if (c == ',' && depth == 0) {
+            break;
+        }
+
+        if (pos < out_size - 1) {
+            out[pos++] = c;
+        }
+        cur++;
+        started = 1;
+    }
+
+    while (pos > 0 && (out[pos - 1] == ' ' || out[pos - 1] == '\t')) {
+        pos--;
+    }
+
+    out[pos] = 0;
+    *src = cur;
+    return started;
+}
+
+/*
+ * Компиляция math_*(...); 1 — ок, 0 — это не native, -1 — синтаксическая ошибка вызова.
+ * На стек кладутся строки аргументов, затем OP_NATIVE_CALL с id функции.
+ */
+static int compile_native_math_call(const char* name, const char** src, Instruction* code, int* ip) {
+    const char* cur = *src;
+    char args[MAX_NATIVE_ARGS][MAX_STRING_LEN];
+    int native_id;
+    int argc = 0;
+
+    native_id = native_math_id_from_name(name);
+    if (native_id < 0) {
+        return 0;
+    }
+
+    cur = skip_inline_space(cur);
+    if (*cur != '(') {
+        return 0;
+    }
+    cur++;
+
+    cur = skip_inline_space(cur);
+    if (*cur == ')') {
+        cur++;
+    } else {
+        while (1) {
+            if (argc >= MAX_NATIVE_ARGS) {
+                *src = cur;
+                return -1;
+            }
+
+            if (!capture_native_math_argument(&cur, args[argc], sizeof(args[argc]))) {
+                *src = cur;
+                return -1;
+            }
+
+            argc++;
+            cur = skip_inline_space(cur);
+
+            if (*cur == ',') {
+                cur++;
+                cur = skip_inline_space(cur);
+                continue;
+            }
+
+            if (*cur == ')') {
+                cur++;
+                break;
+            }
+
+            *src = cur;
+            return -1;
+        }
+    }
+
+    for (int i = 0; i < argc; i++) {
+        char* stored = add_string(args[i]);
+        emit(code, ip, OP_PUSH_STR, (int)stored);
+    }
+
+    emit(code, ip, OP_NATIVE_CALL, native_id);
+    *src = cur;
+    return 1;
+}
+
 static const char* compile_block(const char* src, Instruction* code, int* ip) {
     src = skip_whitespace(src);
 
@@ -184,15 +359,8 @@ static const char* compile_statement(const char* src, Instruction* code, int* ip
         src += 5;
         src = skip_inline_space(src);
 
-        if (*src == '"') {
-            p = src;
-            parse_factor(code, ip);
-            emit(code, ip, OP_PRINT_STR, 0);
-            src = p;
-        } else {
-            compile_expr(src, code, ip);
-            emit(code, ip, OP_PRINT_INT, 0);
-        }
+        compile_expr(src, code, ip);
+        emit(code, ip, OP_PRINT, 0);
 
         return skip_to_line_end(src);
     }
@@ -315,6 +483,26 @@ static void parse_factor(Instruction* code, int* ip) {
     }
 
     if (read_identifier(&p, name)) {
+        const char* after_name = p;
+        int native_id = native_math_id_from_name(name);
+        int native_status = 0;
+
+        /* math_*(...) имеет приоритет над одноимённой переменной. */
+        if (native_id >= 0) {
+            native_status = compile_native_math_call(name, &after_name, code, ip);
+            if (native_status == 1) {
+                p = after_name;
+                return;
+            }
+            if (native_status == -1) {
+                p = after_name;
+                /* Битый вызов: подставляем 0, чтобы компиляция не падала жёстко. */
+                emit(code, ip, OP_PUSH_INT, 0);
+                return;
+            }
+        }
+
+        p = after_name;
         emit(code, ip, OP_LOAD_VAR, var_index(name));
         return;
     }

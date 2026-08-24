@@ -26,5 +26,6 @@ int keyboard_read_int() {
 
 void keyboard_handle_interrupt() {
     keyboard_driver_handle_irq();
+    /* EOI master PIC после обработки IRQ1. */
     port_byte_out(0x20, 0x20);
 }

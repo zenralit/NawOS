@@ -1,3 +1,4 @@
+/* Простые парсеры/форматирование для shell и утилит без libc. */
 #include "lib/nawutil.h"
 
 int naw_atoi(const char* str) {

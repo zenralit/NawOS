@@ -166,6 +166,10 @@ clear
 reboot
 ```
 
+## Complex Math
+
+Calculator and Lelya math usage is documented in [docs/math_ru.md](docs/math_ru.md).
+
 ---
 
 ## Text Editor

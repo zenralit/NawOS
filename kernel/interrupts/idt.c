@@ -28,10 +28,15 @@ void set_idt_gate(int n, uint32_t handler) {
     idt[n].low_offset = handler & 0xFFFF;
     idt[n].sel = 0x08;               
     idt[n].always0 = 0;
+    /* 32-bit interrupt gate, present, DPL 0. */
     idt[n].flags = 0x8E;            
     idt[n].high_offset = (handler >> 16) & 0xFFFF;
 }
 
+/*
+ * Перенос векторов IRQ на 32+: иначе конфликт с исключениями CPU.
+ * Мастер: 0x20, слейв: 0x28; маски оставляют только нужные линии.
+ */
 void remap_pic() {
     outb(0x20, 0x11); 
     outb(0xA0, 0x11); 
@@ -49,6 +54,7 @@ void remap_pic() {
     outb(0xA1, 0xF7); 
 }
 
+/* IRQ0 — таймер, IRQ1 — клавиатура, IRQ11 (0x2B) — RTL8139. */
 void idt_init()
 {
     remap_pic();

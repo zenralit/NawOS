@@ -28,7 +28,10 @@ typedef enum {
     OP_JMP,
     OP_JMP_IF_FALSE,
 
-    // OP_CALL,     
+    /* arg = naw_math_native_id_t; аргументы на стеке — строки-выражения. */
+    OP_NATIVE_CALL,
+
+    // OP_CALL,
     // OP_RET,      
 
     OP_PRINT,
@@ -37,7 +40,7 @@ typedef enum {
 
 typedef struct {
     OpCode op;
-    int arg;
+    int arg; /* для OP_PUSH_STR — указатель на строку, приведённый к int */
 } Instruction;
 
 
