@@ -27,7 +27,7 @@ void kernel_main() {
         
         rtl8139_poll();
         
-        /
+        
         if (net_packet_received) {
             rtl8139_handle_receive();
         }
