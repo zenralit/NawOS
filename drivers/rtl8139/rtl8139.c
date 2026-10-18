@@ -49,14 +49,15 @@
 
 #define RTL_RX_STATUS_OK          0x0001
 #define RTL_TX_STATUS_OWN          0x00002000
-#define RTL_TX_STATUS_DONE_MASK   (RTL_TX_STATUS_OWN | 0x8000 | 0x4000 | \
-                                   0x20000000 | 0x40000000 | 0x80000000)
+#define RTL_TX_STATUS_COMPLETE_MASK (RTL_TX_STATUS_OWN | 0x00008000 | \
+                                    0x00004000 | 0x20000000 | \
+                                    0x40000000 | 0x80000000)
+#define RTL_TX_WAIT_LIMIT         1000000
 
 static uint32_t io_base = 0;
 static int rtl_ready = 0;
 static uint32_t rx_cur = 0;
 static uint8_t tx_slot = 0;
-static uint8_t tx_busy[RTL_TX_BUFFER_COUNT];
 
 uint8_t rtl_mac[6];
 
@@ -64,13 +65,13 @@ static uint8_t rx_buffer[RTL_RX_BUFFER_SIZE] __attribute__((aligned(4096)));
 static uint8_t tx_buffers[RTL_TX_BUFFER_COUNT][RTL_TX_BUFFER_SIZE] __attribute__((aligned(16)));
 static uint8_t rx_frame[NET_ETHERNET_FRAME_MAX_SIZE];
 
-static void rtl8139_reclaim_tx_buffers() {
-    for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
-        uint32_t status = inl(io_base + RTL_REG_TX_STATUS0 + i * 4);
-        if (tx_busy[i] && (status & RTL_TX_STATUS_DONE_MASK)) {
-            tx_busy[i] = 0;
-        }
-    }
+static uint32_t rtl8139_get_tx_status(uint8_t slot) {
+    return inl(io_base + RTL_REG_TX_STATUS0 + slot * 4);
+}
+
+static int rtl8139_tx_slot_available(uint8_t slot) {
+    uint32_t status = rtl8139_get_tx_status(slot);
+    return status == 0 || (status & RTL_TX_STATUS_COMPLETE_MASK) != 0;
 }
 
 int rtl8139_is_ready() {
@@ -95,8 +96,6 @@ void rtl8139_poll() {
     if (status & (RTL_ISR_TX_OK | RTL_ISR_TX_ERR)) {
         rtl8139_acknowledge(status & (RTL_ISR_TX_OK | RTL_ISR_TX_ERR));
     }
-
-    rtl8139_reclaim_tx_buffers();
 
     if ((status & (RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW)) ||
         !(command & RTL_CMD_RX_BUFFER_EMPTY)) {
@@ -157,7 +156,6 @@ int rtl8139_init() {
     tx_slot = 0;
     memset(rx_buffer, 0, sizeof(rx_buffer));
     memset(tx_buffers, 0, sizeof(tx_buffers));
-    memset(tx_busy, 0, sizeof(tx_busy));
 
     outl(io_base + RTL_REG_RX_BUF, (uint32_t)rx_buffer);
     outl(io_base + RTL_REG_TCR, 0x03000600);
@@ -197,21 +195,32 @@ int rtl8139_send_packet(const void* data, uint32_t length) {
         return 0;
     }
 
-    rtl8139_reclaim_tx_buffers();
-    for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
-        slot = (tx_slot + i) % RTL_TX_BUFFER_COUNT;
-        if (!tx_busy[slot]) {
-            tx_slot = (slot + 1) % RTL_TX_BUFFER_COUNT;
-            memcpy(tx_buffers[slot], data, length);
-            outl(io_base + RTL_REG_TX_ADDR0 + slot * 4, (uint32_t)tx_buffers[slot]);
-            tx_busy[slot] = 1;
-            __asm__ volatile("" ::: "memory");
-            outl(io_base + RTL_REG_TX_STATUS0 + slot * 4, length & 0x1FFF);
-            return 1;
+    for (uint32_t attempt = 0; attempt < RTL_TX_WAIT_LIMIT; attempt++) {
+        for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
+            slot = (tx_slot + i) % RTL_TX_BUFFER_COUNT;
+            if (rtl8139_tx_slot_available(slot)) {
+                memcpy(tx_buffers[slot], data, length);
+                outl(io_base + RTL_REG_TX_ADDR0 + slot * 4,
+                     (uint32_t)tx_buffers[slot]);
+                __asm__ volatile("" ::: "memory");
+                outl(io_base + RTL_REG_TX_STATUS0 + slot * 4, length & 0x1FFF);
+                tx_slot = (slot + 1) % RTL_TX_BUFFER_COUNT;
+                return 1;
+            }
+        }
+
+        if ((attempt & 0x3FF) == 0) {
+            rtl8139_poll();
+            __asm__ volatile("pause");
         }
     }
 
-    terminal_write("RTL8139: all TX buffers are busy\n");
+    terminal_write("RTL8139: TX timeout, TSD=");
+    for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
+        terminal_write_hex((uint16_t)rtl8139_get_tx_status(i));
+        terminal_write(" ");
+    }
+    terminal_write("\n");
     return 0;
 }
 
