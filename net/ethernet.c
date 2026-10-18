@@ -1,4 +1,5 @@
 #include "net/ethernet.h"
+#include "net/net_limits.h"
 #include "net/ipv4.h"
 
 static uint16_t ethernet_read_be16(const uint8_t* value) {
@@ -8,7 +9,7 @@ static uint16_t ethernet_read_be16(const uint8_t* value) {
 void ethernet_receive_frame(const uint8_t* frame, size_t len) {
     uint16_t ethertype;
 
-    if (len < 14) {
+    if (!frame || len < NET_ETHERNET_HEADER_SIZE) {
         return;
     }
 
@@ -17,5 +18,6 @@ void ethernet_receive_frame(const uint8_t* frame, size_t len) {
         return;
     }
 
-    ipv4_receive_packet(frame + 14, len - 14);
+    ipv4_receive_packet(frame + NET_ETHERNET_HEADER_SIZE,
+                        len - NET_ETHERNET_HEADER_SIZE);
 }

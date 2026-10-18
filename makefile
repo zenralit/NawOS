@@ -42,6 +42,8 @@ drivers/keyboard/keyboard.o \
 drivers/ports/ports.o \
 drivers/ata/ata.o \
 drivers/pci/pci.o \
+drivers/net/network.o \
+drivers/pcnet/pcnet.o \
 drivers/rtl8139/rtl8139.o \
 fs/nawfs.o \
 lib/math.o \
@@ -57,7 +59,7 @@ apps/nawlang/parser.o \
 apps/nawlang/vm.o \
 apps/nawlang/compiler.o 
 
-.PHONY: all iso vbox run run-iso clean
+.PHONY: all iso vbox run run-iso run-pcnet run-iso-pcnet clean
 
 all: os-image.bin
 
@@ -139,6 +141,21 @@ run-iso: $(ISO_IMAGE)
 		-boot d \
 		-netdev user,id=net0 \
 		-device rtl8139,netdev=net0 \
+		-serial mon:stdio
+
+run-pcnet: os-image.bin
+	qemu-system-i386 \
+	-drive file=os-image.bin,format=raw,if=ide,index=0 \
+	-netdev user,id=net0 \
+	-device pcnet,netdev=net0 \
+	-serial mon:stdio
+
+run-iso-pcnet: $(ISO_IMAGE)
+	qemu-system-i386 \
+		-cdrom $(ISO_IMAGE) \
+		-boot d \
+		-netdev user,id=net0 \
+		-device pcnet,netdev=net0 \
 		-serial mon:stdio
 
 clean:

@@ -4,11 +4,11 @@
 #include "kernel/interrupts/idt.h"
 #include "drivers/keyboard/keyboard.h"
 #include "drivers/ports/ports.h"
+#include "drivers/net/network.h"
 #include "fs/nawfs.h"
 #include "lib/nawstring.h"
 #include "drivers/ata/ata.h"
 #include "net/net.h"
-#include "drivers/rtl8139/rtl8139.h" 
 
 void dummy_timer_callback() {}
     
@@ -19,21 +19,19 @@ void kernel_main() {
     idt_init();
     keyboard_init();
     fs_init();
-    rtl8139_init();
+    network_init();
     asm volatile("sti");
     net_init();
 
     while (1) {
         
-        rtl8139_poll();
-        
-        
-        if (net_packet_received) {
-            rtl8139_handle_receive();
+        network_poll();
+
+        if (network_packet_received) {
+            network_handle_receive();
         }
         
         net_periodic();
         asm volatile("pause");
     }
 }
-

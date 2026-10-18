@@ -8,6 +8,14 @@
 #define DHCP_CLIENT_PORT 68
 #define DHCP_SERVER_PORT 67
 #define DHCP_FIXED_HEADER_SIZE 240
+#define DHCP_MIN_PACKET_SIZE 300
+
+enum {
+    DHCP_STATE_IDLE,
+    DHCP_STATE_DISCOVERING,
+    DHCP_STATE_REQUESTING,
+    DHCP_STATE_BOUND
+};
 
 static const uint8_t zero_ip[4] = {0, 0, 0, 0};
 static const uint8_t broadcast_ip[4] = {255, 255, 255, 255};
@@ -15,7 +23,7 @@ static const uint8_t dhcp_transaction_id[4] = {0x4E, 0x41, 0x57, 0x01};
 
 static uint8_t offered_ip[4];
 static uint8_t server_id[4];
-static int dhcp_bound = 0;
+static int dhcp_state = DHCP_STATE_IDLE;
 
 static void print_ipv4(const uint8_t ip[4]) {
     for (int i = 0; i < 4; i++) {
@@ -82,7 +90,7 @@ static const uint8_t* dhcp_find_option(const uint8_t* options, size_t options_le
     return 0;
 }
 
-static void dhcp_send_request() {
+static int dhcp_send_request() {
     uint8_t packet[548];
     int index = DHCP_FIXED_HEADER_SIZE;
 
@@ -110,24 +118,30 @@ static void dhcp_send_request() {
     packet[index++] = 54;
     packet[index++] = 255;
 
-    udp_send_packet(zero_ip, broadcast_ip, DHCP_CLIENT_PORT, DHCP_SERVER_PORT, packet, (size_t)index);
+    if (!udp_send_packet(zero_ip, broadcast_ip, DHCP_CLIENT_PORT,
+                         DHCP_SERVER_PORT, packet, DHCP_MIN_PACKET_SIZE)) {
+        return 0;
+    }
+
+    dhcp_state = DHCP_STATE_REQUESTING;
+    return 1;
 }
 
 void dhcp_init() {
     memset(offered_ip, 0, sizeof(offered_ip));
     memset(server_id, 0, sizeof(server_id));
-    dhcp_bound = 0;
+    dhcp_state = DHCP_STATE_IDLE;
 }
 
 int dhcp_is_configured() {
-    return dhcp_bound;
+    return dhcp_state == DHCP_STATE_BOUND;
 }
 
-void dhcp_send_discover() {
+int dhcp_send_discover() {
     uint8_t packet[548];
     int index = DHCP_FIXED_HEADER_SIZE;
 
-    dhcp_bound = 0;
+    dhcp_state = DHCP_STATE_IDLE;
     dhcp_write_header(packet);
 
     packet[index++] = 53;
@@ -142,7 +156,13 @@ void dhcp_send_discover() {
     packet[index++] = 54;
     packet[index++] = 255;
 
-    udp_send_packet(zero_ip, broadcast_ip, DHCP_CLIENT_PORT, DHCP_SERVER_PORT, packet, (size_t)index);
+    if (!udp_send_packet(zero_ip, broadcast_ip, DHCP_CLIENT_PORT,
+                         DHCP_SERVER_PORT, packet, DHCP_MIN_PACKET_SIZE)) {
+        return 0;
+    }
+
+    dhcp_state = DHCP_STATE_DISCOVERING;
+    return 1;
 }
 
 void dhcp_handle_udp_packet(const uint8_t* packet, size_t size) {
@@ -153,7 +173,7 @@ void dhcp_handle_udp_packet(const uint8_t* packet, size_t size) {
     const uint8_t* router_option;
     uint8_t option_len = 0;
 
-    if (size < DHCP_FIXED_HEADER_SIZE) {
+    if (!packet || size < DHCP_MIN_PACKET_SIZE) {
         return;
     }
 
@@ -169,13 +189,18 @@ void dhcp_handle_udp_packet(const uint8_t* packet, size_t size) {
         return;
     }
 
+    if (packet[236] != 0x63 || packet[237] != 0x82 ||
+        packet[238] != 0x53 || packet[239] != 0x63) {
+        return;
+    }
+
     options = packet + DHCP_FIXED_HEADER_SIZE;
     message_type = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 53, &option_len);
     if (!message_type || option_len != 1) {
         return;
     }
 
-    if (message_type[0] == 2) {
+    if (message_type[0] == 2 && dhcp_state == DHCP_STATE_DISCOVERING) {
         server_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 54, &option_len);
         if (!server_option || option_len != 4) {
             return;
@@ -188,13 +213,25 @@ void dhcp_handle_udp_packet(const uint8_t* packet, size_t size) {
         print_ipv4(offered_ip);
         terminal_write("\n");
 
-        dhcp_send_request();
+        if (!dhcp_send_request()) {
+            terminal_write("DHCP request could not be queued\n");
+        }
         return;
     }
 
-    if (message_type[0] == 5) {
+    if (message_type[0] == 5 && dhcp_state == DHCP_STATE_REQUESTING) {
+        server_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 54, &option_len);
+        if (!server_option || option_len != 4 ||
+            memcmp(server_option, server_id, 4) != 0 ||
+            memcmp(packet + 16, offered_ip, 4) != 0) {
+            return;
+        }
+
         memcpy(naw_ip_address, packet + 16, 4);
         memcpy(net_info.ip, packet + 16, 4);
+        memset(net_info.gateway, 0, sizeof(net_info.gateway));
+        memset(net_info.subnet, 0, sizeof(net_info.subnet));
+        memset(net_info.dhcp_server, 0, sizeof(net_info.dhcp_server));
 
         subnet_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 1, &option_len);
         if (subnet_option && option_len == 4) {
@@ -202,19 +239,14 @@ void dhcp_handle_udp_packet(const uint8_t* packet, size_t size) {
         }
 
         router_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 3, &option_len);
-        if (router_option && option_len >= 4) {
+        if (router_option && option_len >= 4 && (option_len % 4) == 0) {
             memcpy(net_info.gateway, router_option, 4);
         }
 
-        server_option = dhcp_find_option(options, size - DHCP_FIXED_HEADER_SIZE, 54, &option_len);
-        if (server_option && option_len == 4) {
-            memcpy(net_info.dhcp_server, server_option, 4);
-        } else {
-            memcpy(net_info.dhcp_server, server_id, 4);
-        }
+        memcpy(net_info.dhcp_server, server_option, 4);
 
         net_info.configured = 1;
-        dhcp_bound = 1;
+        dhcp_state = DHCP_STATE_BOUND;
 
         terminal_write("DHCPACK IP ");
         print_ipv4(naw_ip_address);
@@ -224,9 +256,11 @@ void dhcp_handle_udp_packet(const uint8_t* packet, size_t size) {
         return;
     }
 
-    if (message_type[0] == 6) {
+    if (message_type[0] == 6 && dhcp_state == DHCP_STATE_REQUESTING) {
         terminal_write("DHCPNAK received\n");
-        dhcp_bound = 0;
+        dhcp_state = DHCP_STATE_IDLE;
         net_info.configured = 0;
+        memset(naw_ip_address, 0, 4);
+        memset(net_info.ip, 0, sizeof(net_info.ip));
     }
 }

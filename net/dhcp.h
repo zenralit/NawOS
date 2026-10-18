@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 void dhcp_init();
-void dhcp_send_discover();
+int dhcp_send_discover();
 void dhcp_handle_udp_packet(const uint8_t* packet, size_t size);
 int dhcp_is_configured();
 

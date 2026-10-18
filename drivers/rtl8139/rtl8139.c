@@ -3,14 +3,18 @@
 #include "drivers/ports/ports.h"
 #include "kernel/memory/memory.h"
 #include "kernel/terminal/terminal.h"
+#include "drivers/net/network.h"
 #include "net/ethernet.h"
+#include "net/net_limits.h"
 
 #define RTL_VENDOR_ID             0x10EC
 #define RTL_DEVICE_ID             0x8139
 
-#define RTL_RX_BUFFER_SIZE        9728
+#define RTL_RX_RING_SIZE          8192
+#define RTL_RX_BUFFER_SIZE        (RTL_RX_RING_SIZE + 16)
 #define RTL_TX_BUFFER_COUNT       4
-#define RTL_TX_BUFFER_SIZE        2048
+#define RTL_TX_BUFFER_SIZE        NET_ETHERNET_FRAME_MAX_SIZE
+#define RTL_RX_MAX_PACKET_SIZE    NET_ETHERNET_FRAME_WITH_FCS_MAX_SIZE
 
 #define RTL_REG_MAC0              0x00
 #define RTL_REG_TX_STATUS0        0x10
@@ -41,26 +45,21 @@
 #define RTL_RCR_ACCEPT_BROADCAST  0x00000008
 #define RTL_RCR_WRAP              0x00000080
 
-#define RTL_RX_RING_SIZE          8192 
-
-#define RTL_RCR_RBLEN_8K          0x00000000 // Биты 11-12 равны 00
+#define RTL_RCR_RBLEN_8K          0x00000000
 
 #define RTL_RX_STATUS_OK          0x0001
+#define RTL_TX_STATUS_OWN          0x00002000
 
 static uint32_t io_base = 0;
 static int rtl_ready = 0;
 static uint32_t rx_cur = 0;
 static uint8_t tx_slot = 0;
 
-volatile int net_packet_received = 0;
 uint8_t rtl_mac[6];
 
-static uint8_t rx_buffer[RTL_RX_BUFFER_SIZE + 16 + 1500] __attribute__((aligned(4096)));
+static uint8_t rx_buffer[RTL_RX_BUFFER_SIZE] __attribute__((aligned(4096)));
 static uint8_t tx_buffers[RTL_TX_BUFFER_COUNT][RTL_TX_BUFFER_SIZE] __attribute__((aligned(16)));
-
-void set_net_packet_flag() {
-    net_packet_received = 1;
-}
+static uint8_t rx_frame[NET_ETHERNET_FRAME_MAX_SIZE];
 
 int rtl8139_is_ready() {
     return rtl_ready;
@@ -79,55 +78,69 @@ void rtl8139_poll() {
     }
 
     uint16_t status = inw(io_base + RTL_REG_ISR);
+    uint8_t command = inb(io_base + RTL_REG_COMMAND);
 
     if (status & (RTL_ISR_TX_OK | RTL_ISR_TX_ERR)) {
         rtl8139_acknowledge(status & (RTL_ISR_TX_OK | RTL_ISR_TX_ERR));
     }
 
-    // Взводим флаг, только если чип аппаратно подтверждает: пакет в ОЗУ!
-    if (status & RTL_ISR_RX_OK) {
-        net_packet_received = 1;
+    if ((status & (RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW)) ||
+        !(command & RTL_CMD_RX_BUFFER_EMPTY)) {
+        network_set_packet_flag();
     }
 }
 
 void rtl8139_handle_irq() {
-    uint16_t status = inw(io_base + RTL_REG_ISR);
-
     if (!rtl_ready) {
         return;
     }
 
-    // Вызываем обработку, только если чип сам сказал: "Я успешно записал пакет в ОЗУ!"
-    if (status & RTL_ISR_RX_OK) {
-        rtl8139_handle_receive();
+    uint16_t status = inw(io_base + RTL_REG_ISR);
+    if (status & (RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW)) {
+        network_set_packet_flag();
     }
 
-    // Очищаем обработанные прерывания (записью единицы в бит)
     if (status & (RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW | RTL_ISR_TX_OK | RTL_ISR_TX_ERR)) {
         outw(io_base + RTL_REG_ISR, status);
     }
 }
-void rtl8139_init() {
+
+int rtl8139_init() {
     pci_device_t dev = pci_find_device(RTL_VENDOR_ID, RTL_DEVICE_ID);
 
+    rtl_ready = 0;
+    io_base = 0;
     if (dev.vendor_id == 0xFFFF) {
-      terminal_write("RTL8139 not found.\n");
-        return;
+        return 0;
     }
 
     pci_enable_bus_mastering(dev.bus, dev.slot, dev.func);
     io_base = pci_get_bar(dev.bus, dev.slot, dev.func, 0) & ~0x3;
+    if (io_base == 0 || io_base == 0xFFFFFFFC ||
+        (pci_get_bar(dev.bus, dev.slot, dev.func, 0) & 1) == 0) {
+        terminal_write("RTL8139 has an invalid I/O BAR.\n");
+        io_base = 0;
+        return 0;
+    }
 
     outb(io_base + RTL_REG_CONFIG1, 0x00);
     outb(io_base + RTL_REG_COMMAND, RTL_CMD_RESET);
-    while (inb(io_base + RTL_REG_COMMAND) & RTL_CMD_RESET) {
+    uint32_t reset_timeout = 10000000;
+    while ((inb(io_base + RTL_REG_COMMAND) & RTL_CMD_RESET) && reset_timeout > 0) {
+        reset_timeout--;
+    }
+    if (reset_timeout == 0) {
+        terminal_write("RTL8139 reset timed out.\n");
+        io_base = 0;
+        return 0;
     }
 
     for (int i = 0; i < 6; i++) {
         rtl_mac[i] = inb(io_base + RTL_REG_MAC0 + i);
     }
 
-rx_cur = 0;
+    rx_cur = 0;
+    tx_slot = 0;
     memset(rx_buffer, 0, sizeof(rx_buffer));
     memset(tx_buffers, 0, sizeof(tx_buffers));
 
@@ -139,13 +152,11 @@ rx_cur = 0;
          RTL_RCR_ACCEPT_MULTICAST |
          RTL_RCR_ACCEPT_BROADCAST |
          RTL_RCR_RBLEN_8K |
-         RTL_RCR_WRAP); 
-         
-    // Записываем 0xFFF0, НО сразу после этого принудительно очищаем ISR
-    outw(io_base + RTL_REG_CAPR, 0xFFF0); 
+         RTL_RCR_WRAP);
+
+    outw(io_base + RTL_REG_CAPR, 0xFFF0);
     outw(io_base + RTL_REG_IMR, RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_TX_OK | RTL_ISR_TX_ERR);
-    
-    // Включаем RX/TX только ПОСЛЕ того, как все указатели установлены
+
     outb(io_base + RTL_REG_COMMAND, RTL_CMD_RX_ENABLE | RTL_CMD_TX_ENABLE);
 
     rtl_ready = 1;
@@ -161,45 +172,72 @@ rx_cur = 0;
     terminal_write(" IRQ ");
     terminal_write_dec(pci_get_irq_line(dev.bus, dev.slot, dev.func));
     terminal_write("\n");
+    return 1;
 }
 
-void rtl8139_send_packet(void* data, uint32_t length) {
+int rtl8139_send_packet(const void* data, uint32_t length) {
     uint8_t slot;
 
     if (!rtl_ready || data == 0 || length == 0 || length > RTL_TX_BUFFER_SIZE) {
-        return;
+        return 0;
     }
 
-    slot = tx_slot;
-    tx_slot = (tx_slot + 1) % RTL_TX_BUFFER_COUNT;
+    for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
+        slot = (tx_slot + i) % RTL_TX_BUFFER_COUNT;
+        if (inl(io_base + RTL_REG_TX_STATUS0 + slot * 4) & RTL_TX_STATUS_OWN) {
+            tx_slot = (slot + 1) % RTL_TX_BUFFER_COUNT;
+            memcpy(tx_buffers[slot], data, length);
+            outl(io_base + RTL_REG_TX_ADDR0 + slot * 4, (uint32_t)tx_buffers[slot]);
+            outl(io_base + RTL_REG_TX_STATUS0 + slot * 4, length & 0x1FFF);
+            return 1;
+        }
+    }
 
-    memcpy(tx_buffers[slot], data, length);
-    outl(io_base + RTL_REG_TX_ADDR0 + slot * 4, (uint32_t)tx_buffers[slot]);
-    outl(io_base + RTL_REG_TX_STATUS0 + slot * 4, length & 0x1FFF);
+    return 0;
 }
 
-#define RTL_REG_CBR 0x3A // Регистр текущего адреса записи чипа (Current Buffer Address)
+#define RTL_REG_CBR 0x3A
+
+static void rtl8139_copy_from_rx_ring(uint8_t* dest, uint32_t offset, uint32_t length) {
+    uint32_t first = RTL_RX_RING_SIZE - offset;
+    if (first > length) {
+        first = length;
+    }
+
+    memcpy(dest, rx_buffer + offset, first);
+    if (length > first) {
+        memcpy(dest + first, rx_buffer, length - first);
+    }
+}
+
+static void rtl8139_advance_rx_cursor(uint32_t packet_len) {
+    rx_cur = (rx_cur + packet_len + 7) & ~3U;
+    rx_cur %= RTL_RX_RING_SIZE;
+
+    uint32_t capr_value = (rx_cur - 0x10 + RTL_RX_RING_SIZE) % RTL_RX_RING_SIZE;
+    outw(io_base + RTL_REG_CAPR, (uint16_t)capr_value);
+}
 
 void rtl8139_handle_receive() {
     if (!rtl_ready) {
         return;
     }
 
-    int max_packets = 16; 
+    network_packet_received = 0;
+    int max_packets = 32;
 
     while (!(inb(io_base + RTL_REG_COMMAND) & RTL_CMD_RX_BUFFER_EMPTY)) {
         if (max_packets-- <= 0) {
             break;
         }
 
-        uint32_t offset = rx_cur % 8192;
-        
+        uint32_t offset = rx_cur % RTL_RX_RING_SIZE;
+
         __asm__ volatile("" ::: "memory");
 
         volatile uint16_t* status_ptr = (volatile uint16_t*)(rx_buffer + offset);
         volatile uint16_t* len_ptr = (volatile uint16_t*)(rx_buffer + offset + 2);
-        
-        // Короткое ожидание DMA
+
         int timeout = 100;
         while (*status_ptr == 0 && *len_ptr == 0 && timeout > 0) {
             __asm__ volatile("pause");
@@ -208,51 +246,37 @@ void rtl8139_handle_receive() {
 
         uint16_t status = *status_ptr;
         uint16_t packet_len = *len_ptr;
-        uint8_t* packet = rx_buffer + offset + 4;
 
-        // --- ФИКС ХАНГ-АУТА (НУЛЕВОЙ ПУЛЕМЕТ) ---
         if (status == 0 && packet_len == 0) {
-            // Читаем, куда чип СЕЙЧАС аппаратно указывает в буфере
             uint16_t cbr = inw(io_base + RTL_REG_CBR);
-            
-            // Принудительно выравниваем и переносим наш указатель туда, где находится чип
-            rx_cur = (cbr + 3) & ~3;
-            
-            // Сообщаем чипу, что мы «прочитали» всё вплоть до этой точки
-            uint32_t capr_value = (rx_cur - 0x10 + 8192) % 8192;
+            rx_cur = ((uint32_t)cbr + 3) & ~3U;
+            rx_cur %= RTL_RX_RING_SIZE;
+            uint32_t capr_value = (rx_cur - 0x10 + RTL_RX_RING_SIZE) % RTL_RX_RING_SIZE;
             outw(io_base + RTL_REG_CAPR, (uint16_t)capr_value);
-            
-            terminal_write("[RTL8139] DMA Sync Reset applied via CBR\n");
-            break; // Выходим из прерывания, пулемет остановлен
+            break;
         }
 
-        // Проверка флага успешного приема и ограничений по размеру
-        if (!(status & RTL_RX_STATUS_OK) || packet_len < 4 || packet_len > 1518 + 4) {
-            terminal_write("[RTL8139] Bad Frame Header. Resetting ring.\n");
-            
-            // Если заголовок просто побит мусором, сбрасываем указатель на CBR чипа
+        if (!(status & RTL_RX_STATUS_OK) || packet_len < 4 ||
+            packet_len > RTL_RX_MAX_PACKET_SIZE) {
             uint16_t cbr = inw(io_base + RTL_REG_CBR);
-            rx_cur = (cbr + 3) & ~3;
-            uint32_t capr_value = (rx_cur - 0x10 + 8192) % 8192;
+            rx_cur = ((uint32_t)cbr + 3) & ~3U;
+            rx_cur %= RTL_RX_RING_SIZE;
+            uint32_t capr_value = (rx_cur - 0x10 + RTL_RX_RING_SIZE) % RTL_RX_RING_SIZE;
             outw(io_base + RTL_REG_CAPR, (uint16_t)capr_value);
-            
             rtl8139_acknowledge(RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW);
             break;
         }
 
-        // Если пакет валидный — обрабатываем!
-        ethernet_receive_frame(packet, packet_len - 4);
+        uint16_t frame_len = packet_len - 4;
+        rtl8139_copy_from_rx_ring(rx_frame, (offset + 4) % RTL_RX_RING_SIZE, frame_len);
+        ethernet_receive_frame(rx_frame, frame_len);
+        rtl8139_advance_rx_cursor(packet_len + 4);
 
-        // Продвигаем указатели для успешного пакета
-        rx_cur = (rx_cur + packet_len + 4 + 3) & ~3;
-        uint32_t capr_value = (rx_cur - 0x10 + 8192) % 8192;
-        outw(io_base + RTL_REG_CAPR, (uint16_t)capr_value);
-        rx_cur %= 8192;
-        
         __asm__ volatile("" ::: "memory");
     }
 
-    // Сброс флагов прерываний
     rtl8139_acknowledge(RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW);
-    net_packet_received = 0;
+    if (!(inb(io_base + RTL_REG_COMMAND) & RTL_CMD_RX_BUFFER_EMPTY)) {
+        network_packet_received = 1;
+    }
 }

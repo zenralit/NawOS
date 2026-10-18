@@ -1,8 +1,9 @@
 #include "kernel/shell/shell_input.h"
 #include "kernel/shell/shell.h"
 #include "kernel/terminal/terminal.h"
+#include "net/net_limits.h"
 
-#define SHELL_INPUT_BUFFER_SIZE 256
+#define SHELL_INPUT_BUFFER_SIZE (NET_UDP_PAYLOAD_MAX_SIZE + sizeof("netmsg ") + 1)
 
 static char shell_input_buffer[SHELL_INPUT_BUFFER_SIZE];
 static int shell_input_pos = 0;

@@ -1,4 +1,5 @@
 #include "net/ipv4.h"
+#include "net/net_limits.h"
 #include "net/udp.h"
 
 uint16_t ipv4_read_be16(const uint8_t* value) {
@@ -30,27 +31,34 @@ uint16_t ipv4_checksum(const uint8_t* data, size_t len) {
 
 void ipv4_receive_packet(const uint8_t* packet, size_t len) {
     uint16_t total_len;
+    uint16_t fragment;
     uint8_t ihl;
 
-    if (len < 20 || (packet[0] >> 4) != 4) {
+    if (!packet || len < NET_IPV4_HEADER_SIZE || (packet[0] >> 4) != 4) {
         return;
     }
 
     ihl = (uint8_t)((packet[0] & 0x0F) * 4);
-    if (ihl < 20 || len < ihl) {
+    if (ihl < NET_IPV4_HEADER_SIZE || len < ihl) {
         return;
     }
 
     total_len = ipv4_read_be16(packet + 2);
-    if (total_len < ihl) {
+    if (total_len < ihl || total_len > len ||
+        total_len > NET_ETHERNET_MTU) {
         return;
     }
 
-    if (total_len > len) {
-        total_len = (uint16_t)len;
+    if (ipv4_checksum(packet, ihl) != 0) {
+        return;
     }
 
-    if (packet[9] != 17 || total_len < ihl + 8) {
+    fragment = ipv4_read_be16(packet + 6);
+    if ((fragment & 0x3FFF) != 0) {
+        return;
+    }
+
+    if (packet[9] != 17 || total_len < ihl + NET_UDP_HEADER_SIZE) {
         return;
     }
 

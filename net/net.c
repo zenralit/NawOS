@@ -1,6 +1,7 @@
 #include "net/net.h"
-#include "drivers/rtl8139/rtl8139.h"
+#include "drivers/net/network.h"
 #include "kernel/memory/memory.h"
+#include "kernel/terminal/terminal.h"
 #include "lib/nawstring.h"
 #include "net/dhcp.h"
 #include "net/ip.h"
@@ -17,8 +18,8 @@ uint8_t naw_mac_address[6];
 void net_init() {
     memset(&net_info, 0, sizeof(net_info));
     memset(naw_ip_address, 0, 4);
-    memcpy(naw_mac_address, rtl_mac, sizeof(naw_mac_address));
-    memcpy(net_info.mac, rtl_mac, sizeof(net_info.mac));
+    memcpy(naw_mac_address, network_mac, sizeof(naw_mac_address));
+    memcpy(net_info.mac, network_mac, sizeof(net_info.mac));
 
     dhcp_init();
     net_request_dhcp();
@@ -39,7 +40,7 @@ void net_periodic() {
 }
 
 int net_is_configured() {
-    return net_info.configured;
+    return net_info.configured && dhcp_is_configured();
 }
 
 void net_request_dhcp() {
@@ -50,16 +51,17 @@ void net_request_dhcp() {
     memset(net_info.dhcp_server, 0, sizeof(net_info.dhcp_server));
     net_info.configured = 0;
 
-    //print("NET: requesting DHCP lease\n");
-    dhcp_send_discover();
+    if (!dhcp_send_discover()) {
+        terminal_write("DHCP discover could not be queued\n");
+    }
     dhcp_retry_ticks = NET_DHCP_RETRY_TICKS;
 }
 
-void net_send_text_broadcast(const char* text) {
-    if (!net_is_configured()) {
-        //print("NET: no IP address yet\n");
-        return;
+int net_send_text_broadcast(const char* text) {
+    if (!net_is_configured() || !text) {
+        return 0;
     }
 
-    udp_send_packet(naw_ip_address, broadcast_ip, NET_TEXT_PORT, NET_TEXT_PORT, (const uint8_t*)text, strlen(text));
+    return udp_send_packet(naw_ip_address, broadcast_ip, NET_TEXT_PORT,
+                           NET_TEXT_PORT, (const uint8_t*)text, strlen(text));
 }

@@ -11,6 +11,7 @@
 #include "lib/nawstring.h"
 #include "lib/nawutil.h"
 #include "net/ip.h"
+#include "net/net_limits.h"
 #include "net/net.h"
 
 static void shell_print_ipv4(const uint8_t ip[4]) {
@@ -226,8 +227,11 @@ void shell_execute_command(const char* input) {
     } else if (strncmp(input, "netmsg ", 7) == 0) {
         if (input[7] == '\0') {
             terminal_write("Usage: netmsg <text>\n");
+        } else if (strlen(input + 7) > NET_UDP_PAYLOAD_MAX_SIZE) {
+            terminal_write("Message exceeds the UDP payload limit\n");
+        } else if (!net_send_text_broadcast(input + 7)) {
+            terminal_write("Network is not ready or the packet could not be queued\n");
         } else {
-            net_send_text_broadcast(input + 7);
             terminal_write("UDP broadcast sent\n");
         }
     } else if (strcmp(input, "ipconfig") == 0) {

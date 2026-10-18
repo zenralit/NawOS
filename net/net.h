@@ -22,6 +22,6 @@ void net_init();
 void net_periodic();
 int net_is_configured();
 void net_request_dhcp();
-void net_send_text_broadcast(const char* text);
+int net_send_text_broadcast(const char* text);
 
 #endif
