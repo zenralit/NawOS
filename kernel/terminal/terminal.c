@@ -320,9 +320,11 @@ void terminal_put_char(char c) {
 }
 
 void terminal_write(const char* str) {
+    terminal_begin_batch();
     while (*str) {
         terminal_put_char(*str++);
     }
+    terminal_end_batch();
 }
 
 void terminal_backspace() {

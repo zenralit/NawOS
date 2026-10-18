@@ -104,10 +104,12 @@ void udp_receive_packet(const uint8_t src_ip[4], const uint8_t dest_ip[4], const
     }
 
     if (dst_port == NET_TEXT_PORT) {
+        terminal_begin_batch();
         terminal_write("\nfrom ");
         udp_print_ipv4(src_ip);
         terminal_write(" > ");
         udp_print_text_payload(payload, udp_len - NET_UDP_HEADER_SIZE);
         terminal_write("\n> ");
+        terminal_end_batch();
     }
 }
