@@ -51,7 +51,9 @@ void net_request_dhcp() {
     memset(net_info.dhcp_server, 0, sizeof(net_info.dhcp_server));
     net_info.configured = 0;
 
-    if (!dhcp_send_discover()) {
+    if (!network_is_ready()) {
+        terminal_write("DHCP failed: no network adapter is ready\n");
+    } else if (!dhcp_send_discover()) {
         terminal_write("DHCP discover could not be queued\n");
     }
     dhcp_retry_ticks = NET_DHCP_RETRY_TICKS;

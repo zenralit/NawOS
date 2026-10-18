@@ -36,14 +36,15 @@ void pci_config_write_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offs
 }
 
 pci_device_t pci_find_device(uint16_t vendor_id, uint16_t device_id) {
-    for (uint8_t bus = 0; bus < 256; bus++) {
+    for (uint16_t bus = 0; bus < 256; bus++) {
+        uint8_t pci_bus = (uint8_t)bus;
         for (uint8_t slot = 0; slot < 32; slot++) {
             for (uint8_t func = 0; func < 8; func++) {
-                uint16_t vid = pci_config_read_word(bus, slot, func, 0);
+                uint16_t vid = pci_config_read_word(pci_bus, slot, func, 0);
                 if (vid == 0xFFFF) continue;
-                uint16_t did = pci_config_read_word(bus, slot, func, 2);
+                uint16_t did = pci_config_read_word(pci_bus, slot, func, 2);
                 if (vid == vendor_id && did == device_id) {
-                    return (pci_device_t){ bus, slot, func, vid, did };
+                    return (pci_device_t){ pci_bus, slot, func, vid, did };
                 }
             }
         }

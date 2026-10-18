@@ -178,7 +178,7 @@ int pcnet_init() {
 
     terminal_write("PCnet MAC: ");
     for (uint8_t i = 0; i < 6; i++) {
-        terminal_write_hex(pcnet_mac[i]);
+        terminal_write_hex_byte(pcnet_mac[i]);
         if (i < 5) {
             terminal_write(":");
         }

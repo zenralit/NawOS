@@ -26,6 +26,7 @@ void terminal_backspace();
 void terminal_write_double(double value);
 void terminal_write_int(int num);
 void terminal_write_hex(uint16_t value);
+void terminal_write_hex_byte(uint8_t value);
 int16_t terminal_get_cursor_offset();
 void terminal_set_cursor_offset(uint16_t offset);
 void terminal_write_dec(uint32_t num);

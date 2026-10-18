@@ -237,7 +237,7 @@ void shell_execute_command(const char* input) {
     } else if (strcmp(input, "ipconfig") == 0) {
         terminal_write("MAC: ");
         for (int i = 0; i < 6; i++) {
-            terminal_write_hex(net_info.mac[i]);
+            terminal_write_hex_byte(net_info.mac[i]);
             if (i < 5) {
                 terminal_write(":");
             }

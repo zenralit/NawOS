@@ -417,6 +417,12 @@ void terminal_write_hex(uint16_t value) {
     terminal_write(output);
 }
 
+void terminal_write_hex_byte(uint8_t value) {
+    static const char hex_digits[] = "0123456789ABCDEF";
+    terminal_put_char(hex_digits[value >> 4]);
+    terminal_put_char(hex_digits[value & 0x0F]);
+}
+
 void terminal_write_dec(uint32_t num) {
     char buffer[12];
     int i = 0;

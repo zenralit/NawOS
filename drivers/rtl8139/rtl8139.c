@@ -54,6 +54,7 @@ static uint32_t io_base = 0;
 static int rtl_ready = 0;
 static uint32_t rx_cur = 0;
 static uint8_t tx_slot = 0;
+static uint8_t tx_busy[RTL_TX_BUFFER_COUNT];
 
 uint8_t rtl_mac[6];
 
@@ -82,6 +83,13 @@ void rtl8139_poll() {
 
     if (status & (RTL_ISR_TX_OK | RTL_ISR_TX_ERR)) {
         rtl8139_acknowledge(status & (RTL_ISR_TX_OK | RTL_ISR_TX_ERR));
+    }
+
+    for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
+        uint32_t tx_status = inl(io_base + RTL_REG_TX_STATUS0 + i * 4);
+        if (tx_busy[i] && (tx_status & RTL_TX_STATUS_OWN)) {
+            tx_busy[i] = 0;
+        }
     }
 
     if ((status & (RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW)) ||
@@ -143,6 +151,7 @@ int rtl8139_init() {
     tx_slot = 0;
     memset(rx_buffer, 0, sizeof(rx_buffer));
     memset(tx_buffers, 0, sizeof(tx_buffers));
+    memset(tx_busy, 0, sizeof(tx_busy));
 
     outl(io_base + RTL_REG_RX_BUF, (uint32_t)rx_buffer);
     outl(io_base + RTL_REG_TCR, 0x03000600);
@@ -162,9 +171,9 @@ int rtl8139_init() {
     rtl_ready = 1;
     rtl8139_acknowledge(0xFFFF);
 
-    terminal_write("MAC: ");
+    terminal_write("RTL8139 MAC: ");
     for (int i = 0; i < 6; i++) {
-        terminal_write_hex(rtl_mac[i]);
+        terminal_write_hex_byte(rtl_mac[i]);
         if (i < 5) {
             terminal_write(":");
         }
@@ -184,10 +193,12 @@ int rtl8139_send_packet(const void* data, uint32_t length) {
 
     for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
         slot = (tx_slot + i) % RTL_TX_BUFFER_COUNT;
-        if (inl(io_base + RTL_REG_TX_STATUS0 + slot * 4) & RTL_TX_STATUS_OWN) {
+        if (!tx_busy[slot]) {
             tx_slot = (slot + 1) % RTL_TX_BUFFER_COUNT;
             memcpy(tx_buffers[slot], data, length);
             outl(io_base + RTL_REG_TX_ADDR0 + slot * 4, (uint32_t)tx_buffers[slot]);
+            tx_busy[slot] = 1;
+            __asm__ volatile("" ::: "memory");
             outl(io_base + RTL_REG_TX_STATUS0 + slot * 4, length & 0x1FFF);
             return 1;
         }
@@ -270,7 +281,7 @@ void rtl8139_handle_receive() {
         uint16_t frame_len = packet_len - 4;
         rtl8139_copy_from_rx_ring(rx_frame, (offset + 4) % RTL_RX_RING_SIZE, frame_len);
         ethernet_receive_frame(rx_frame, frame_len);
-        rtl8139_advance_rx_cursor(packet_len + 4);
+        rtl8139_advance_rx_cursor(packet_len);
 
         __asm__ volatile("" ::: "memory");
     }
