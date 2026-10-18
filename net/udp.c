@@ -72,7 +72,11 @@ int udp_send_packet(const uint8_t src_ip[4], const uint8_t dest_ip[4], uint16_t 
         memcpy(udp + 8, data, len);
     }
 
-    return network_send_packet(packet, NET_ETHERNET_HEADER_SIZE + total_len);
+    uint32_t frame_len = NET_ETHERNET_HEADER_SIZE + total_len;
+    if (frame_len < NET_ETHERNET_MIN_FRAME_SIZE) {
+        frame_len = NET_ETHERNET_MIN_FRAME_SIZE;
+    }
+    return network_send_packet(packet, frame_len);
 }
 
 void udp_receive_packet(const uint8_t src_ip[4], const uint8_t dest_ip[4], const uint8_t* packet, size_t len) {

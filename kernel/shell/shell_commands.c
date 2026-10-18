@@ -229,8 +229,10 @@ void shell_execute_command(const char* input) {
             terminal_write("Usage: netmsg <text>\n");
         } else if (strlen(input + 7) > NET_UDP_PAYLOAD_MAX_SIZE) {
             terminal_write("Message exceeds the UDP payload limit\n");
+        } else if (!net_is_configured()) {
+            terminal_write("No configured IP address; run dhcp first\n");
         } else if (!net_send_text_broadcast(input + 7)) {
-            terminal_write("Network is not ready or the packet could not be queued\n");
+            terminal_write("Failed to queue UDP broadcast\n");
         } else {
             terminal_write("UDP broadcast sent\n");
         }

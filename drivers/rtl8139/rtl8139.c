@@ -49,6 +49,8 @@
 
 #define RTL_RX_STATUS_OK          0x0001
 #define RTL_TX_STATUS_OWN          0x00002000
+#define RTL_TX_STATUS_DONE_MASK   (RTL_TX_STATUS_OWN | 0x8000 | 0x4000 | \
+                                   0x20000000 | 0x40000000 | 0x80000000)
 
 static uint32_t io_base = 0;
 static int rtl_ready = 0;
@@ -61,6 +63,15 @@ uint8_t rtl_mac[6];
 static uint8_t rx_buffer[RTL_RX_BUFFER_SIZE] __attribute__((aligned(4096)));
 static uint8_t tx_buffers[RTL_TX_BUFFER_COUNT][RTL_TX_BUFFER_SIZE] __attribute__((aligned(16)));
 static uint8_t rx_frame[NET_ETHERNET_FRAME_MAX_SIZE];
+
+static void rtl8139_reclaim_tx_buffers() {
+    for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
+        uint32_t status = inl(io_base + RTL_REG_TX_STATUS0 + i * 4);
+        if (tx_busy[i] && (status & RTL_TX_STATUS_DONE_MASK)) {
+            tx_busy[i] = 0;
+        }
+    }
+}
 
 int rtl8139_is_ready() {
     return rtl_ready;
@@ -85,12 +96,7 @@ void rtl8139_poll() {
         rtl8139_acknowledge(status & (RTL_ISR_TX_OK | RTL_ISR_TX_ERR));
     }
 
-    for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
-        uint32_t tx_status = inl(io_base + RTL_REG_TX_STATUS0 + i * 4);
-        if (tx_busy[i] && (tx_status & RTL_TX_STATUS_OWN)) {
-            tx_busy[i] = 0;
-        }
-    }
+    rtl8139_reclaim_tx_buffers();
 
     if ((status & (RTL_ISR_RX_OK | RTL_ISR_RX_ERR | RTL_ISR_RX_OVERFLOW)) ||
         !(command & RTL_CMD_RX_BUFFER_EMPTY)) {
@@ -191,6 +197,7 @@ int rtl8139_send_packet(const void* data, uint32_t length) {
         return 0;
     }
 
+    rtl8139_reclaim_tx_buffers();
     for (uint8_t i = 0; i < RTL_TX_BUFFER_COUNT; i++) {
         slot = (tx_slot + i) % RTL_TX_BUFFER_COUNT;
         if (!tx_busy[slot]) {
@@ -204,6 +211,7 @@ int rtl8139_send_packet(const void* data, uint32_t length) {
         }
     }
 
+    terminal_write("RTL8139: all TX buffers are busy\n");
     return 0;
 }
 
