@@ -10,11 +10,39 @@
 #define NET_DHCP_RETRY_TICKS 100000
 
 static const uint8_t broadcast_ip[4] = {255, 255, 255, 255};
+static const uint8_t qemu_link_mac_prefix[5] = {
+    0x52, 0x54, 0x00, 0x4E, 0x41
+};
 static int dhcp_retry_ticks = 0;
 static int static_ip_configured = 0;
 
 net_info_t net_info;
 uint8_t naw_mac_address[6];
+
+static int net_configure_qemu_link_ip() {
+    uint8_t ip[4] = {10, 0, 0, 0};
+
+    if (memcmp(naw_mac_address, qemu_link_mac_prefix,
+               sizeof(qemu_link_mac_prefix)) != 0 ||
+        (naw_mac_address[5] != 1 && naw_mac_address[5] != 2)) {
+        return 0;
+    }
+
+    ip[3] = naw_mac_address[5];
+    if (!net_set_static_ip(ip)) {
+        return 0;
+    }
+
+    terminal_write("Static IP set to ");
+    for (int i = 0; i < 4; i++) {
+        terminal_write_dec(ip[i]);
+        if (i < 3) {
+            terminal_write(".");
+        }
+    }
+    terminal_write("\n");
+    return 1;
+}
 
 void net_init() {
     memset(&net_info, 0, sizeof(net_info));
@@ -24,7 +52,9 @@ void net_init() {
     memcpy(net_info.mac, network_mac, sizeof(net_info.mac));
 
     dhcp_init();
-    net_request_dhcp();
+    if (!net_configure_qemu_link_ip()) {
+        net_request_dhcp();
+    }
 }
 
 void net_periodic() {

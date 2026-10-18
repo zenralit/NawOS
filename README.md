@@ -207,28 +207,25 @@ Both adapters use an Ethernet MTU of 1500 bytes. NawOS can send UDP broadcast
 messages up to 1472 bytes of text payload with `netmsg <text>`; received
 messages appear as `from <IPv4> > <text>`.
 
-`make run` and `make run-iso` use QEMU's user-mode network, which provides DHCP
-for a single guest. Its broadcast domain is isolated per QEMU process, so two
-separately started guests will not receive each other's broadcasts by default.
-Use `make run-fresh` to force a rebuild before starting the RTL8139 guest; this
-avoids accidentally testing an older `os-image.bin`.
+Run `make run` to build the disk image if needed and open two connected QEMU
+guests. The launcher gives them `10.0.0.1` and `10.0.0.2` automatically. In
+either guest window, enter `netmsg hello`; the other guest displays
+`from <sender IPv4> > hello`. Both guests use snapshot disks, so changes to the
+disk are discarded when they close. Press Ctrl+C in the terminal running
+`make run` to close both guests.
 
-For two local QEMU guests, first run `make -B os-image.bin` to rebuild once.
-Then start `make run-link-listen` in one terminal and `make run-link-connect` in
-another. These targets connect the guests to the same virtual Ethernet segment
-and use snapshot disks. This point-to-point QEMU socket link has no DHCP server,
-so set distinct addresses in each guest before sending:
+The pair launcher requires Python 3 and QEMU. Use `make run-fresh` to force a
+rebuild before launching the pair. Run `make run-test` to boot the pair
+headlessly and confirm both guests boot with their addresses configured. The
+socket link is a shared virtual Ethernet segment but has no DHCP server, so the
+QEMU pair uses reserved MAC addresses to select `10.0.0.1` and `10.0.0.2`
+automatically; other adapters continue to use DHCP. `make run-iso` remains a
+single guest on QEMU user-mode networking; that network's broadcast domain is
+isolated per QEMU process, so it does not provide chat between separately
+started guests.
 
-```text
-Guest 1: ipset 10.0.0.1
-Guest 2: ipset 10.0.0.2
-Guest 1: netmsg hello
-```
-
-Messages remain UDP broadcasts and appear on the peer as
-`from 10.0.0.1 > hello`. For guests on different hosts, connect them to the same
-bridged Layer-2 network and use DHCP or `ipset`; QEMU user-mode NAT does not
-share broadcasts across processes. For VirtualBox, set Adapter 1 to
+For guests on different hosts, connect them to the same bridged Layer-2 network
+and use DHCP or `ipset`. For VirtualBox, set Adapter 1 to
 **Bridged Adapter**, select the same network segment, and choose **AMD PCNet
 FAST III (Am79C973)**. The PCnet driver is selected automatically when RTL8139
 is not present.

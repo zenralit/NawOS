@@ -3,6 +3,7 @@ CC = gcc
 LD = ld
 OBJCOPY = objcopy
 QEMU = qemu-system-i386
+PYTHON = python3
 MKISOFS ?= mkisofs
 
 CFLAGS  = -m32 -ffreestanding -O2 -Wall -I. -mno-sse -mno-sse2 -mno-mmx
@@ -13,6 +14,7 @@ CC = /ucrt64/bin/clang.exe
 LD = /ucrt64/bin/ld.lld.exe
 OBJCOPY = /ucrt64/bin/objcopy.exe
 QEMU = /ucrt64/bin/qemu-system-i386.exe
+PYTHON = py -3
 CFLAGS += --target=i386-unknown-none-elf
 endif
 
@@ -70,7 +72,7 @@ apps/nawlang/parser.o \
 apps/nawlang/vm.o \
 apps/nawlang/compiler.o 
 
-.PHONY: all iso vbox run run-fresh run-link-listen run-link-connect run-iso run-pcnet run-iso-pcnet clean
+.PHONY: all iso vbox run run-fresh run-test run-iso run-pcnet run-iso-pcnet clean
 
 all: os-image.bin
 
@@ -140,35 +142,14 @@ $(VBOX_DISK_IMAGE): os-image.bin
 vbox: $(ISO_IMAGE) $(VBOX_DISK_IMAGE)
 
 run: os-image.bin
-	$(QEMU) \
-	-drive file=os-image.bin,format=raw,if=ide,index=0 \
-	-netdev user,id=net0 \
-	-device rtl8139,netdev=net0 \
-	-serial mon:stdio
+	QEMU="$(QEMU)" $(PYTHON) tools/run_qemu_pair.py
 
 run-fresh:
 	$(MAKE) -B os-image.bin
-	$(QEMU) \
-	-drive file=os-image.bin,format=raw,if=ide,index=0 \
-	-netdev user,id=net0 \
-	-device rtl8139,netdev=net0 \
-	-serial mon:stdio
+	QEMU="$(QEMU)" $(PYTHON) tools/run_qemu_pair.py
 
-run-link-listen: os-image.bin
-	$(QEMU) \
-	-snapshot \
-	-drive file=os-image.bin,format=raw,if=ide,index=0 \
-	-netdev socket,id=net0,listen=127.0.0.1:45570 \
-	-device rtl8139,netdev=net0,mac=52:54:00:12:34:56 \
-	-serial mon:stdio
-
-run-link-connect: os-image.bin
-	$(QEMU) \
-	-snapshot \
-	-drive file=os-image.bin,format=raw,if=ide,index=0 \
-	-netdev socket,id=net0,connect=127.0.0.1:45570 \
-	-device rtl8139,netdev=net0,mac=52:54:00:12:34:57 \
-	-serial mon:stdio
+run-test: os-image.bin
+	QEMU="$(QEMU)" $(PYTHON) tools/run_qemu_pair.py --self-test
 
 run-iso: $(ISO_IMAGE)
 	$(QEMU) \
