@@ -141,14 +141,15 @@ $(VBOX_DISK_IMAGE): os-image.bin
 
 vbox: $(ISO_IMAGE) $(VBOX_DISK_IMAGE)
 
-run: os-image.bin
-	QEMU="$(QEMU)" $(PYTHON) tools/run_qemu_pair.py
-
-run-fresh:
+run:
 	$(MAKE) -B os-image.bin
 	QEMU="$(QEMU)" $(PYTHON) tools/run_qemu_pair.py
 
-run-test: os-image.bin
+run-fresh:
+	$(MAKE) run
+
+run-test:
+	$(MAKE) -B os-image.bin
 	QEMU="$(QEMU)" $(PYTHON) tools/run_qemu_pair.py --self-test
 
 run-iso: $(ISO_IMAGE)

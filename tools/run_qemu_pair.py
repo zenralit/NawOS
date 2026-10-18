@@ -21,9 +21,14 @@ BOOT_TIMEOUT = 90
 
 
 class QMP:
-    def __init__(self, port):
+    def __init__(self, port, process):
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
+            exit_code = process.poll()
+            if exit_code is not None:
+                raise RuntimeError(
+                    f"QEMU exited with status {exit_code} before opening QMP on port {port}"
+                )
             try:
                 self.sock = socket.create_connection(("127.0.0.1", port), timeout=1)
                 break
@@ -213,7 +218,7 @@ def main():
                         args.self_test,
                     )
                 )
-                monitors.append(QMP(qmp_ports[index]))
+                monitors.append(QMP(qmp_ports[index], processes[index]))
                 wait_for_guest(monitors[index], screen_paths[index], index, ip)
 
             if args.self_test:

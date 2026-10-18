@@ -173,7 +173,8 @@ int pcnet_init() {
         return 0;
     }
 
-    pcnet_write_csr(PCNET_CSR0, PCNET_CSR0_START | PCNET_CSR0_INTEN);
+    /* PCnet RX is polled; keep interrupts disabled because only IRQ11 is routed. */
+    pcnet_write_csr(PCNET_CSR0, PCNET_CSR0_START);
     pcnet_ready = 1;
 
     terminal_write("PCnet MAC: ");
@@ -213,24 +214,33 @@ void pcnet_handle_irq() {
 }
 
 int pcnet_send_packet(const void* data, uint32_t length) {
+    uint8_t slot;
+    uint8_t offset;
+
     if (!pcnet_ready || !data || length == 0 || length > PCNET_MAX_FRAME_SIZE) {
         return 0;
     }
 
-    volatile pcnet_descriptor_t* descriptor = &transmit_ring[transmit_index];
-    if (descriptor->status & PCNET_DESC_OWN) {
+    for (offset = 0; offset < PCNET_TX_RING_SIZE; offset++) {
+        slot = (transmit_index + offset) % PCNET_TX_RING_SIZE;
+        if (!(transmit_ring[slot].status & PCNET_DESC_OWN)) {
+            break;
+        }
+    }
+    if (offset == PCNET_TX_RING_SIZE) {
         return 0;
     }
 
-    memcpy(transmit_buffers[transmit_index], data, length);
-    descriptor->base = (uint32_t)transmit_buffers[transmit_index];
+    volatile pcnet_descriptor_t* descriptor = &transmit_ring[slot];
+    memcpy(transmit_buffers[slot], data, length);
+    descriptor->base = (uint32_t)transmit_buffers[slot];
     descriptor->buffer_length = (uint16_t)(-(int)length);
     descriptor->message_length = 0;
     descriptor->reserved = 0;
     __asm__ volatile("" ::: "memory");
     descriptor->status = PCNET_DESC_OWN | PCNET_DESC_STP | PCNET_DESC_ENP;
 
-    transmit_index = (transmit_index + 1) % PCNET_TX_RING_SIZE;
+    transmit_index = (slot + 1) % PCNET_TX_RING_SIZE;
     pcnet_write_csr(PCNET_CSR0, PCNET_CSR0_START | PCNET_CSR0_TDMD);
     return 1;
 }

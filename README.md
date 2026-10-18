@@ -207,8 +207,8 @@ Both adapters use an Ethernet MTU of 1500 bytes. NawOS can send UDP broadcast
 messages up to 1472 bytes of text payload with `netmsg <text>`; received
 messages appear as `from <IPv4> > <text>`.
 
-Run `make run` to build the disk image if needed and open two connected QEMU
-guests. The launcher gives them `10.0.0.1` and `10.0.0.2` automatically. In
+Run `make run` to rebuild the disk image and open two connected QEMU guests.
+The launcher gives them `10.0.0.1` and `10.0.0.2` automatically. In
 either guest window, enter `netmsg hello`; the other guest displays
 `from <sender IPv4> > hello`. Both guests use snapshot disks, so changes to the
 disk are discarded when they close. Press Ctrl+C in the terminal running
@@ -225,10 +225,31 @@ isolated per QEMU process, so it does not provide chat between separately
 started guests.
 
 For guests on different hosts, connect them to the same bridged Layer-2 network
-and use DHCP or `ipset`. For VirtualBox, set Adapter 1 to
-**Bridged Adapter**, select the same network segment, and choose **AMD PCNet
-FAST III (Am79C973)**. The PCnet driver is selected automatically when RTL8139
-is not present.
+and use DHCP or `ipset`. To connect two NawOS VirtualBox guests locally:
+
+1. In each VM's **Settings → Network → Adapter 1**, enable the adapter, choose
+   **Internal Network**, and give both adapters the same name, such as
+   `nawos-chat`.
+2. In **Advanced → Adapter Type**, choose **PCnet-FAST III (Am79C973)**.
+3. Boot both guests and set different addresses in the same subnet:
+
+   ```text
+   Guest 1: ipset 10.0.0.11
+   Guest 2: ipset 10.0.0.12
+   Guest 1: netmsg hello
+   ```
+
+   The receiving guest displays `from 10.0.0.11 > hello`. The PCnet driver
+   handles receive polling and Ethernet broadcast, and is selected
+   automatically when RTL8139 is absent.
+
+If DHCP is preferred, use the same **Host-only Adapter** on both guests and
+enable its DHCP server in VirtualBox's Host Network Manager. **Bridged
+Adapter** also works when both guests are on the same LAN with DHCP, although
+some Wi-Fi access points isolate clients and block guest-to-guest broadcasts.
+Do not use separate **NAT** adapters when the guests need to exchange
+broadcasts. The two QEMU guests started by `make run` use their own private
+socket link; they do not automatically join a VirtualBox network.
 
 ---
 
@@ -329,7 +350,7 @@ make
 # Run
 
 ```bash
-make run-fresh
+make run
 ```
 
 ---
