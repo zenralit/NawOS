@@ -22,6 +22,7 @@ void net_init();
 void net_periodic();
 int net_is_configured();
 void net_request_dhcp();
+int net_set_static_ip(const uint8_t ip[4]);
 int net_send_text_broadcast(const char* text);
 
 #endif

@@ -23,6 +23,44 @@ static void shell_print_ipv4(const uint8_t ip[4]) {
     }
 }
 
+static int shell_parse_ipv4(const char* input, uint8_t ip[4]) {
+    const char* cursor = input;
+
+    if (!cursor || !ip) {
+        return 0;
+    }
+
+    for (int octet = 0; octet < 4; octet++) {
+        unsigned int value = 0;
+        int digits = 0;
+
+        while (*cursor >= '0' && *cursor <= '9') {
+            value = value * 10 + (unsigned int)(*cursor - '0');
+            if (value > 255) {
+                return 0;
+            }
+            cursor++;
+            digits++;
+        }
+
+        if (digits == 0) {
+            return 0;
+        }
+        ip[octet] = (uint8_t)value;
+
+        if (octet < 3) {
+            if (*cursor != '.') {
+                return 0;
+            }
+            cursor++;
+        } else if (*cursor != '\0') {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static const char* shell_skip_spaces(const char* input) {
     while (input && (*input == ' ' || *input == '\t')) {
         input++;
@@ -110,6 +148,7 @@ static void shell_print_help() {
     terminal_write("edit <name.ext> - text editor\n");
     terminal_write("calc - complex math tools\n");
     terminal_write("dhcp - Request a DHCP lease\n");
+    terminal_write("ipset <ipv4> - Set a static address without DHCP\n");
     terminal_write("ipconfig - Show network configuration\n");
     terminal_write("netmsg <text> - Broadcast UDP text\n");
 }
@@ -224,13 +263,25 @@ void shell_execute_command(const char* input) {
         shell_dump_scancodes();
     } else if (strcmp(input, "dhcp") == 0) {
         net_request_dhcp();
+    } else if (strncmp(input, "ipset ", 6) == 0) {
+        uint8_t ip[4];
+
+        if (!shell_parse_ipv4(shell_skip_spaces(input + 6), ip)) {
+            terminal_write("Usage: ipset <ipv4>\n");
+        } else if (!net_set_static_ip(ip)) {
+            terminal_write("Could not set static IP address\n");
+        } else {
+            terminal_write("Static IP set to ");
+            shell_print_ipv4(ip);
+            terminal_write("\n");
+        }
     } else if (strncmp(input, "netmsg ", 7) == 0) {
         if (input[7] == '\0') {
             terminal_write("Usage: netmsg <text>\n");
         } else if (strlen(input + 7) > NET_UDP_PAYLOAD_MAX_SIZE) {
             terminal_write("Message exceeds the UDP payload limit\n");
         } else if (!net_is_configured()) {
-            terminal_write("No configured IP address; run dhcp first\n");
+            terminal_write("No configured IP address; run dhcp or ipset first\n");
         } else if (!net_send_text_broadcast(input + 7)) {
             terminal_write("Failed to queue UDP broadcast\n");
         } else {

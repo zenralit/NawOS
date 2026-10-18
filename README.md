@@ -210,22 +210,28 @@ messages appear as `from <IPv4> > <text>`.
 `make run` and `make run-iso` use QEMU's user-mode network, which provides DHCP
 for a single guest. Its broadcast domain is isolated per QEMU process, so two
 separately started guests will not receive each other's broadcasts by default.
-To exchange messages between guests, attach all of them to the same Layer-2
-network and use a DHCP server on that network. For example, on a host with a
-configured bridge, start each QEMU guest with:
+Use `make run-fresh` to force a rebuild before starting the RTL8139 guest; this
+avoids accidentally testing an older `os-image.bin`.
 
-```bash
--netdev bridge,id=net0,br=br0 -device rtl8139,netdev=net0
+For two local QEMU guests, first run `make -B os-image.bin` to rebuild once.
+Then start `make run-link-listen` in one terminal and `make run-link-connect` in
+another. These targets connect the guests to the same virtual Ethernet segment
+and use snapshot disks. This point-to-point QEMU socket link has no DHCP server,
+so set distinct addresses in each guest before sending:
+
+```text
+Guest 1: ipset 10.0.0.1
+Guest 2: ipset 10.0.0.2
+Guest 1: netmsg hello
 ```
 
-This requires the host bridge and QEMU bridge helper to be configured. For
-VirtualBox, set Adapter 1 to **Bridged Adapter**, select the same host network
-network segment connected to QEMU's bridge, and choose **AMD PCNet FAST III
-(Am79C973)** as the adapter type. The PCnet driver is selected automatically
-when RTL8139 is not present. `make run-pcnet` and `make run-iso-pcnet` can also
-run the PCnet device in QEMU. A DHCP server must be reachable on the shared
-network; VirtualBox's private NAT network and QEMU's user-mode NAT are not a
-shared broadcast domain.
+Messages remain UDP broadcasts and appear on the peer as
+`from 10.0.0.1 > hello`. For guests on different hosts, connect them to the same
+bridged Layer-2 network and use DHCP or `ipset`; QEMU user-mode NAT does not
+share broadcasts across processes. For VirtualBox, set Adapter 1 to
+**Bridged Adapter**, select the same network segment, and choose **AMD PCNet
+FAST III (Am79C973)**. The PCnet driver is selected automatically when RTL8139
+is not present.
 
 ---
 
@@ -306,11 +312,11 @@ apps/nawlang/       Virtual machine
 
 # Requirements
 
-- GCC
 - NASM
 - GNU Make
-- LD
 - QEMU (qemu-system-i386)
+- Linux: GCC and binutils
+- Windows/MSYS2 UCRT64: Clang, LLD, and GNU objcopy (selected by the makefile)
 
 ---
 
@@ -326,7 +332,7 @@ make
 # Run
 
 ```bash
-make run
+make run-fresh
 ```
 
 ---
